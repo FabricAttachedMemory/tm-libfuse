@@ -3,9 +3,9 @@ exec_prefix=@exec_prefix@
 libdir=@libdir@
 includedir=@includedir@
 
-Name: fuse
+Name: tmfs
 Description: Filesystem in Userspace
 Version: @VERSION@
-Libs: -L${libdir} -lfuse -pthread
-Libs.private: @libfuse_libs@
-Cflags: -I${includedir}/fuse -D_FILE_OFFSET_BITS=64
+Libs: -L${libdir} -ltmfs -pthread
+Libs.private: @libtmfs_libs@
+Cflags: -I${includedir}/tmfs -D_FILE_OFFSET_BITS=64

@@ -1,29 +1,29 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU LGPLv2.
   See the file COPYING.LIB.
 */
 
-#ifndef _FUSE_LOWLEVEL_H_
-#define _FUSE_LOWLEVEL_H_
+#ifndef _TMFS_LOWLEVEL_H_
+#define _TMFS_LOWLEVEL_H_
 
 /** @file
  *
  * Low level API
  *
- * IMPORTANT: you should define FUSE_USE_VERSION before including this
+ * IMPORTANT: you should define TMFS_USE_VERSION before including this
  * header.  To use the newest API define it to 26 (recommended for any
  * new application), to use the old API define it to 24 (default) or
  * 25
  */
 
-#ifndef FUSE_USE_VERSION
-#define FUSE_USE_VERSION 24
+#ifndef TMFS_USE_VERSION
+#define TMFS_USE_VERSION 24
 #endif
 
-#include "fuse_common.h"
+#include "tmfs_common.h"
 
 #include <utime.h>
 #include <fcntl.h>
@@ -41,20 +41,20 @@ extern "C" {
  * ----------------------------------------------------------- */
 
 /** The node ID of the root inode */
-#define FUSE_ROOT_ID 1
+#define TMFS_ROOT_ID 1
 
 /** Inode number type */
-typedef unsigned long fuse_ino_t;
+typedef unsigned long tmfs_ino_t;
 
 /** Request pointer type */
-typedef struct fuse_req *fuse_req_t;
+typedef struct tmfs_req *tmfs_req_t;
 
 /**
  * Session
  *
  * This provides hooks for processing requests, and exiting
  */
-struct fuse_session;
+struct tmfs_session;
 
 /**
  * Channel
@@ -62,10 +62,10 @@ struct fuse_session;
  * A communication channel, providing hooks for sending and receiving
  * messages
  */
-struct fuse_chan;
+struct tmfs_chan;
 
-/** Directory entry parameters supplied to fuse_reply_entry() */
-struct fuse_entry_param {
+/** Directory entry parameters supplied to tmfs_reply_entry() */
+struct tmfs_entry_param {
 	/** Unique inode number
 	 *
 	 * In lookup, zero means negative entry (from version 2.5)
@@ -73,7 +73,7 @@ struct fuse_entry_param {
 	 * ino the kernel may cache negative entries for entry_timeout
 	 * seconds.
 	 */
-	fuse_ino_t ino;
+	tmfs_ino_t ino;
 
 	/** Generation number for this entry.
 	 *
@@ -84,7 +84,7 @@ struct fuse_entry_param {
 	 * it must assign a new, previously unused generation number
 	 * to the inode at the same time.
 	 *
-	 * The generation must be non-zero, otherwise FUSE will treat
+	 * The generation must be non-zero, otherwise TMFS will treat
 	 * it as an error.
 	 *
 	 */
@@ -93,7 +93,7 @@ struct fuse_entry_param {
 	/** Inode attributes.
 	 *
 	 * Even if attr_timeout == 0, attr must be correct. For example,
-	 * for open(), FUSE uses attr.st_size from lookup() to determine
+	 * for open(), TMFS uses attr.st_size from lookup() to determine
 	 * how many bytes to request. If this value is not correct,
 	 * incorrect data will be returned.
 	 */
@@ -107,7 +107,7 @@ struct fuse_entry_param {
 };
 
 /** Additional context associated with requests */
-struct fuse_ctx {
+struct tmfs_ctx {
 	/** User ID of the calling process */
 	uid_t uid;
 
@@ -121,20 +121,20 @@ struct fuse_ctx {
 	mode_t umask;
 };
 
-struct fuse_forget_data {
+struct tmfs_forget_data {
 	uint64_t ino;
 	uint64_t nlookup;
 };
 
 /* 'to_set' flags in setattr */
-#define FUSE_SET_ATTR_MODE	(1 << 0)
-#define FUSE_SET_ATTR_UID	(1 << 1)
-#define FUSE_SET_ATTR_GID	(1 << 2)
-#define FUSE_SET_ATTR_SIZE	(1 << 3)
-#define FUSE_SET_ATTR_ATIME	(1 << 4)
-#define FUSE_SET_ATTR_MTIME	(1 << 5)
-#define FUSE_SET_ATTR_ATIME_NOW	(1 << 7)
-#define FUSE_SET_ATTR_MTIME_NOW	(1 << 8)
+#define TMFS_SET_ATTR_MODE	(1 << 0)
+#define TMFS_SET_ATTR_UID	(1 << 1)
+#define TMFS_SET_ATTR_GID	(1 << 2)
+#define TMFS_SET_ATTR_SIZE	(1 << 3)
+#define TMFS_SET_ATTR_ATIME	(1 << 4)
+#define TMFS_SET_ATTR_MTIME	(1 << 5)
+#define TMFS_SET_ATTR_ATIME_NOW	(1 << 7)
+#define TMFS_SET_ATTR_MTIME_NOW	(1 << 8)
 
 /* ----------------------------------------------------------- *
  * Request methods and replies				       *
@@ -144,24 +144,24 @@ struct fuse_forget_data {
  * Low level filesystem operations
  *
  * Most of the methods (with the exception of init and destroy)
- * receive a request handle (fuse_req_t) as their first argument.
+ * receive a request handle (tmfs_req_t) as their first argument.
  * This handle must be passed to one of the specified reply functions.
  *
  * This may be done inside the method invocation, or after the call
  * has returned.  The request handle is valid until one of the reply
  * functions is called.
  *
- * Other pointer arguments (name, fuse_file_info, etc) are not valid
+ * Other pointer arguments (name, tmfs_file_info, etc) are not valid
  * after the call has returned, so if they are needed later, their
  * contents have to be copied.
  *
  * The filesystem sometimes needs to handle a return value of -ENOENT
  * from the reply function, which means, that the request was
  * interrupted, and the reply discarded.  For example if
- * fuse_reply_open() return -ENOENT means, that the release method for
+ * tmfs_reply_open() return -ENOENT means, that the release method for
  * this file will not be called.
  */
-struct fuse_lowlevel_ops {
+struct tmfs_lowlevel_ops {
 	/**
 	 * Initialize filesystem
 	 *
@@ -169,9 +169,9 @@ struct fuse_lowlevel_ops {
 	 *
 	 * There's no reply to this function
 	 *
-	 * @param userdata the user data passed to fuse_lowlevel_new()
+	 * @param userdata the user data passed to tmfs_lowlevel_new()
 	 */
-	void (*init) (void *userdata, struct fuse_conn_info *conn);
+	void (*init) (void *userdata, struct tmfs_conn_info *conn);
 
 	/**
 	 * Clean up filesystem
@@ -180,7 +180,7 @@ struct fuse_lowlevel_ops {
 	 *
 	 * There's no reply to this function
 	 *
-	 * @param userdata the user data passed to fuse_lowlevel_new()
+	 * @param userdata the user data passed to tmfs_lowlevel_new()
 	 */
 	void (*destroy) (void *userdata);
 
@@ -188,14 +188,14 @@ struct fuse_lowlevel_ops {
 	 * Look up a directory entry by name and get its attributes.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_entry
-	 *   fuse_reply_err
+	 *   tmfs_reply_entry
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param parent inode number of the parent directory
 	 * @param name the name to look up
 	 */
-	void (*lookup) (fuse_req_t req, fuse_ino_t parent, const char *name);
+	void (*lookup) (tmfs_req_t req, tmfs_ino_t parent, const char *name);
 
 	/**
 	 * Forget about an inode
@@ -204,7 +204,7 @@ struct fuse_lowlevel_ops {
 	 * from its internal caches.
 	 *
 	 * The inode's lookup count increases by one for every call to
-	 * fuse_reply_entry and fuse_reply_create. The nlookup parameter
+	 * tmfs_reply_entry and tmfs_reply_create. The nlookup parameter
 	 * indicates by how much the lookup count should be decreased.
 	 *
 	 * Inodes with a non-zero lookup count may receive request from
@@ -219,7 +219,7 @@ struct fuse_lowlevel_ops {
 	 *
 	 * Note that if a file system will be exported over NFS the
 	 * inodes lifetime must extend even beyond forget. See the
-	 * generation field in struct fuse_entry_param above.
+	 * generation field in struct tmfs_entry_param above.
 	 *
 	 * On unmount the lookup count for all inodes implicitly drops
 	 * to zero. It is not guaranteed that the file system will
@@ -227,27 +227,27 @@ struct fuse_lowlevel_ops {
 	 * inodes.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_none
+	 *   tmfs_reply_none
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param nlookup the number of lookups to forget
 	 */
-	void (*forget) (fuse_req_t req, fuse_ino_t ino, unsigned long nlookup);
+	void (*forget) (tmfs_req_t req, tmfs_ino_t ino, unsigned long nlookup);
 
 	/**
 	 * Get file attributes
 	 *
 	 * Valid replies:
-	 *   fuse_reply_attr
-	 *   fuse_reply_err
+	 *   tmfs_reply_attr
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param fi for future use, currently always NULL
 	 */
-	void (*getattr) (fuse_req_t req, fuse_ino_t ino,
-			 struct fuse_file_info *fi);
+	void (*getattr) (tmfs_req_t req, tmfs_ino_t ino,
+			 struct tmfs_file_info *fi);
 
 	/**
 	 * Set file attributes
@@ -264,8 +264,8 @@ struct fuse_lowlevel_ops {
 	 * parameter will be NULL.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_attr
-	 *   fuse_reply_err
+	 *   tmfs_reply_attr
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
@@ -276,20 +276,20 @@ struct fuse_lowlevel_ops {
 	 * Changed in version 2.5:
 	 *     file information filled in for ftruncate
 	 */
-	void (*setattr) (fuse_req_t req, fuse_ino_t ino, struct stat *attr,
-			 int to_set, struct fuse_file_info *fi);
+	void (*setattr) (tmfs_req_t req, tmfs_ino_t ino, struct stat *attr,
+			 int to_set, struct tmfs_file_info *fi);
 
 	/**
 	 * Read symbolic link
 	 *
 	 * Valid replies:
-	 *   fuse_reply_readlink
-	 *   fuse_reply_err
+	 *   tmfs_reply_readlink
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 */
-	void (*readlink) (fuse_req_t req, fuse_ino_t ino);
+	void (*readlink) (tmfs_req_t req, tmfs_ino_t ino);
 
 	/**
 	 * Create file node
@@ -298,8 +298,8 @@ struct fuse_lowlevel_ops {
 	 * socket node.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_entry
-	 *   fuse_reply_err
+	 *   tmfs_reply_entry
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param parent inode number of the parent directory
@@ -307,22 +307,22 @@ struct fuse_lowlevel_ops {
 	 * @param mode file type and mode with which to create the new file
 	 * @param rdev the device number (only valid if created file is a device)
 	 */
-	void (*mknod) (fuse_req_t req, fuse_ino_t parent, const char *name,
+	void (*mknod) (tmfs_req_t req, tmfs_ino_t parent, const char *name,
 		       mode_t mode, dev_t rdev);
 
 	/**
 	 * Create a directory
 	 *
 	 * Valid replies:
-	 *   fuse_reply_entry
-	 *   fuse_reply_err
+	 *   tmfs_reply_entry
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param parent inode number of the parent directory
 	 * @param name to create
 	 * @param mode with which to create the new file
 	 */
-	void (*mkdir) (fuse_req_t req, fuse_ino_t parent, const char *name,
+	void (*mkdir) (tmfs_req_t req, tmfs_ino_t parent, const char *name,
 		       mode_t mode);
 
 	/**
@@ -334,13 +334,13 @@ struct fuse_lowlevel_ops {
 	 * forget function).
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param parent inode number of the parent directory
 	 * @param name to remove
 	 */
-	void (*unlink) (fuse_req_t req, fuse_ino_t parent, const char *name);
+	void (*unlink) (tmfs_req_t req, tmfs_ino_t parent, const char *name);
 
 	/**
 	 * Remove a directory
@@ -351,27 +351,27 @@ struct fuse_lowlevel_ops {
 	 * of the forget function).
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param parent inode number of the parent directory
 	 * @param name to remove
 	 */
-	void (*rmdir) (fuse_req_t req, fuse_ino_t parent, const char *name);
+	void (*rmdir) (tmfs_req_t req, tmfs_ino_t parent, const char *name);
 
 	/**
 	 * Create a symbolic link
 	 *
 	 * Valid replies:
-	 *   fuse_reply_entry
-	 *   fuse_reply_err
+	 *   tmfs_reply_entry
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param link the contents of the symbolic link
 	 * @param parent inode number of the parent directory
 	 * @param name to create
 	 */
-	void (*symlink) (fuse_req_t req, const char *link, fuse_ino_t parent,
+	void (*symlink) (tmfs_req_t req, const char *link, tmfs_ino_t parent,
 			 const char *name);
 
 	/** Rename a file
@@ -383,7 +383,7 @@ struct fuse_lowlevel_ops {
 	 * forget function).
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param parent inode number of the old parent directory
@@ -391,22 +391,22 @@ struct fuse_lowlevel_ops {
 	 * @param newparent inode number of the new parent directory
 	 * @param newname new name
 	 */
-	void (*rename) (fuse_req_t req, fuse_ino_t parent, const char *name,
-			fuse_ino_t newparent, const char *newname);
+	void (*rename) (tmfs_req_t req, tmfs_ino_t parent, const char *name,
+			tmfs_ino_t newparent, const char *newname);
 
 	/**
 	 * Create a hard link
 	 *
 	 * Valid replies:
-	 *   fuse_reply_entry
-	 *   fuse_reply_err
+	 *   tmfs_reply_entry
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the old inode number
 	 * @param newparent inode number of the new parent directory
 	 * @param newname new name to create
 	 */
-	void (*link) (fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent,
+	void (*link) (tmfs_req_t req, tmfs_ino_t ino, tmfs_ino_t newparent,
 		      const char *newname);
 
 	/**
@@ -424,18 +424,18 @@ struct fuse_lowlevel_ops {
 	 *
 	 * There are also some flags (direct_io, keep_cache) which the
 	 * filesystem may set in fi, to change the way the file is opened.
-	 * See fuse_file_info structure in <fuse_common.h> for more details.
+	 * See tmfs_file_info structure in <tmfs_common.h> for more details.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_open
-	 *   fuse_reply_err
+	 *   tmfs_reply_open
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param fi file information
 	 */
-	void (*open) (fuse_req_t req, fuse_ino_t ino,
-		      struct fuse_file_info *fi);
+	void (*open) (tmfs_req_t req, tmfs_ino_t ino,
+		      struct tmfs_file_info *fi);
 
 	/**
 	 * Read data
@@ -451,10 +451,10 @@ struct fuse_lowlevel_ops {
 	 * be undefined if the open method didn't set any value.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_buf
-	 *   fuse_reply_iov
-	 *   fuse_reply_data
-	 *   fuse_reply_err
+	 *   tmfs_reply_buf
+	 *   tmfs_reply_iov
+	 *   tmfs_reply_data
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
@@ -462,8 +462,8 @@ struct fuse_lowlevel_ops {
 	 * @param off offset to read from
 	 * @param fi file information
 	 */
-	void (*read) (fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
-		      struct fuse_file_info *fi);
+	void (*read) (tmfs_req_t req, tmfs_ino_t ino, size_t size, off_t off,
+		      struct tmfs_file_info *fi);
 
 	/**
 	 * Write data
@@ -478,8 +478,8 @@ struct fuse_lowlevel_ops {
 	 * be undefined if the open method didn't set any value.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_write
-	 *   fuse_reply_err
+	 *   tmfs_reply_write
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
@@ -488,8 +488,8 @@ struct fuse_lowlevel_ops {
 	 * @param off offset to write to
 	 * @param fi file information
 	 */
-	void (*write) (fuse_req_t req, fuse_ino_t ino, const char *buf,
-		       size_t size, off_t off, struct fuse_file_info *fi);
+	void (*write) (tmfs_req_t req, tmfs_ino_t ino, const char *buf,
+		       size_t size, off_t off, struct tmfs_file_info *fi);
 
 	/**
 	 * Flush method
@@ -514,14 +514,14 @@ struct fuse_lowlevel_ops {
 	 * getlk) it should remove all locks belonging to 'fi->owner'.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param fi file information
 	 */
-	void (*flush) (fuse_req_t req, fuse_ino_t ino,
-		       struct fuse_file_info *fi);
+	void (*flush) (tmfs_req_t req, tmfs_ino_t ino,
+		       struct tmfs_file_info *fi);
 
 	/**
 	 * Release an open file
@@ -541,14 +541,14 @@ struct fuse_lowlevel_ops {
 	 * fi->flags will contain the same flags as for open.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param fi file information
 	 */
-	void (*release) (fuse_req_t req, fuse_ino_t ino,
-			 struct fuse_file_info *fi);
+	void (*release) (tmfs_req_t req, tmfs_ino_t ino,
+			 struct tmfs_file_info *fi);
 
 	/**
 	 * Synchronize file contents
@@ -557,15 +557,15 @@ struct fuse_lowlevel_ops {
 	 * should be flushed, not the meta data.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param datasync flag indicating if only data should be flushed
 	 * @param fi file information
 	 */
-	void (*fsync) (fuse_req_t req, fuse_ino_t ino, int datasync,
-		       struct fuse_file_info *fi);
+	void (*fsync) (tmfs_req_t req, tmfs_ino_t ino, int datasync,
+		       struct tmfs_file_info *fi);
 
 	/**
 	 * Open a directory
@@ -581,20 +581,20 @@ struct fuse_lowlevel_ops {
 	 * and releasedir.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_open
-	 *   fuse_reply_err
+	 *   tmfs_reply_open
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param fi file information
 	 */
-	void (*opendir) (fuse_req_t req, fuse_ino_t ino,
-			 struct fuse_file_info *fi);
+	void (*opendir) (tmfs_req_t req, tmfs_ino_t ino,
+			 struct tmfs_file_info *fi);
 
 	/**
 	 * Read directory
 	 *
-	 * Send a buffer filled using fuse_add_direntry(), with size not
+	 * Send a buffer filled using tmfs_add_direntry(), with size not
 	 * exceeding the requested size.  Send an empty buffer on end of
 	 * stream.
 	 *
@@ -602,9 +602,9 @@ struct fuse_lowlevel_ops {
 	 * will be undefined if the opendir method didn't set any value.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_buf
-	 *   fuse_reply_data
-	 *   fuse_reply_err
+	 *   tmfs_reply_buf
+	 *   tmfs_reply_data
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
@@ -612,8 +612,8 @@ struct fuse_lowlevel_ops {
 	 * @param off offset to continue reading the directory stream
 	 * @param fi file information
 	 */
-	void (*readdir) (fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
-			 struct fuse_file_info *fi);
+	void (*readdir) (tmfs_req_t req, tmfs_ino_t ino, size_t size, off_t off,
+			 struct tmfs_file_info *fi);
 
 	/**
 	 * Release an open directory
@@ -625,14 +625,14 @@ struct fuse_lowlevel_ops {
 	 * will be undefined if the opendir method didn't set any value.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param fi file information
 	 */
-	void (*releasedir) (fuse_req_t req, fuse_ino_t ino,
-			    struct fuse_file_info *fi);
+	void (*releasedir) (tmfs_req_t req, tmfs_ino_t ino,
+			    struct tmfs_file_info *fi);
 
 	/**
 	 * Synchronize directory contents
@@ -644,99 +644,99 @@ struct fuse_lowlevel_ops {
 	 * will be undefined if the opendir method didn't set any value.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param datasync flag indicating if only data should be flushed
 	 * @param fi file information
 	 */
-	void (*fsyncdir) (fuse_req_t req, fuse_ino_t ino, int datasync,
-			  struct fuse_file_info *fi);
+	void (*fsyncdir) (tmfs_req_t req, tmfs_ino_t ino, int datasync,
+			  struct tmfs_file_info *fi);
 
 	/**
 	 * Get file system statistics
 	 *
 	 * Valid replies:
-	 *   fuse_reply_statfs
-	 *   fuse_reply_err
+	 *   tmfs_reply_statfs
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number, zero means "undefined"
 	 */
-	void (*statfs) (fuse_req_t req, fuse_ino_t ino);
+	void (*statfs) (tmfs_req_t req, tmfs_ino_t ino);
 
 	/**
 	 * Set an extended attribute
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 */
-	void (*setxattr) (fuse_req_t req, fuse_ino_t ino, const char *name,
+	void (*setxattr) (tmfs_req_t req, tmfs_ino_t ino, const char *name,
 			  const char *value, size_t size, int flags);
 
 	/**
 	 * Get an extended attribute
 	 *
 	 * If size is zero, the size of the value should be sent with
-	 * fuse_reply_xattr.
+	 * tmfs_reply_xattr.
 	 *
 	 * If the size is non-zero, and the value fits in the buffer, the
-	 * value should be sent with fuse_reply_buf.
+	 * value should be sent with tmfs_reply_buf.
 	 *
 	 * If the size is too small for the value, the ERANGE error should
 	 * be sent.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_buf
-	 *   fuse_reply_data
-	 *   fuse_reply_xattr
-	 *   fuse_reply_err
+	 *   tmfs_reply_buf
+	 *   tmfs_reply_data
+	 *   tmfs_reply_xattr
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param name of the extended attribute
 	 * @param size maximum size of the value to send
 	 */
-	void (*getxattr) (fuse_req_t req, fuse_ino_t ino, const char *name,
+	void (*getxattr) (tmfs_req_t req, tmfs_ino_t ino, const char *name,
 			  size_t size);
 
 	/**
 	 * List extended attribute names
 	 *
 	 * If size is zero, the total size of the attribute list should be
-	 * sent with fuse_reply_xattr.
+	 * sent with tmfs_reply_xattr.
 	 *
 	 * If the size is non-zero, and the null character separated
 	 * attribute list fits in the buffer, the list should be sent with
-	 * fuse_reply_buf.
+	 * tmfs_reply_buf.
 	 *
 	 * If the size is too small for the list, the ERANGE error should
 	 * be sent.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_buf
-	 *   fuse_reply_data
-	 *   fuse_reply_xattr
-	 *   fuse_reply_err
+	 *   tmfs_reply_buf
+	 *   tmfs_reply_data
+	 *   tmfs_reply_xattr
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param size maximum size of the list to send
 	 */
-	void (*listxattr) (fuse_req_t req, fuse_ino_t ino, size_t size);
+	void (*listxattr) (tmfs_req_t req, tmfs_ino_t ino, size_t size);
 
 	/**
 	 * Remove an extended attribute
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param name of the extended attribute
 	 */
-	void (*removexattr) (fuse_req_t req, fuse_ino_t ino, const char *name);
+	void (*removexattr) (tmfs_req_t req, tmfs_ino_t ino, const char *name);
 
 	/**
 	 * Check file access permissions
@@ -750,13 +750,13 @@ struct fuse_lowlevel_ops {
 	 * Introduced in version 2.5
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param mask requested access mode
 	 */
-	void (*access) (fuse_req_t req, fuse_ino_t ino, int mask);
+	void (*access) (tmfs_req_t req, tmfs_ino_t ino, int mask);
 
 	/**
 	 * Create and open a file
@@ -773,7 +773,7 @@ struct fuse_lowlevel_ops {
 	 *
 	 * There are also some flags (direct_io, keep_cache) which the
 	 * filesystem may set in fi, to change the way the file is opened.
-	 * See fuse_file_info structure in <fuse_common.h> for more details.
+	 * See tmfs_file_info structure in <tmfs_common.h> for more details.
 	 *
 	 * If this method is not implemented or under Linux kernel
 	 * versions earlier than 2.6.15, the mknod() and open() methods
@@ -782,8 +782,8 @@ struct fuse_lowlevel_ops {
 	 * Introduced in version 2.5
 	 *
 	 * Valid replies:
-	 *   fuse_reply_create
-	 *   fuse_reply_err
+	 *   tmfs_reply_create
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param parent inode number of the parent directory
@@ -791,8 +791,8 @@ struct fuse_lowlevel_ops {
 	 * @param mode file type and mode with which to create the new file
 	 * @param fi file information
 	 */
-	void (*create) (fuse_req_t req, fuse_ino_t parent, const char *name,
-			mode_t mode, struct fuse_file_info *fi);
+	void (*create) (tmfs_req_t req, tmfs_ino_t parent, const char *name,
+			mode_t mode, struct tmfs_file_info *fi);
 
 	/**
 	 * Test for a POSIX file lock
@@ -800,16 +800,16 @@ struct fuse_lowlevel_ops {
 	 * Introduced in version 2.6
 	 *
 	 * Valid replies:
-	 *   fuse_reply_lock
-	 *   fuse_reply_err
+	 *   tmfs_reply_lock
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param fi file information
 	 * @param lock the region/type to test
 	 */
-	void (*getlk) (fuse_req_t req, fuse_ino_t ino,
-		       struct fuse_file_info *fi, struct flock *lock);
+	void (*getlk) (tmfs_req_t req, tmfs_ino_t ino,
+		       struct tmfs_file_info *fi, struct flock *lock);
 
 	/**
 	 * Acquire, modify or release a POSIX file lock
@@ -827,7 +827,7 @@ struct fuse_lowlevel_ops {
 	 * Introduced in version 2.6
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
@@ -835,8 +835,8 @@ struct fuse_lowlevel_ops {
 	 * @param lock the region/type to set
 	 * @param sleep locking operation may sleep
 	 */
-	void (*setlk) (fuse_req_t req, fuse_ino_t ino,
-		       struct fuse_file_info *fi,
+	void (*setlk) (tmfs_req_t req, tmfs_ino_t ino,
+		       struct tmfs_file_info *fi,
 		       struct flock *lock, int sleep);
 
 	/**
@@ -848,46 +848,46 @@ struct fuse_lowlevel_ops {
 	 * Introduced in version 2.6
 	 *
 	 * Valid replies:
-	 *   fuse_reply_bmap
-	 *   fuse_reply_err
+	 *   tmfs_reply_bmap
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param blocksize unit of block index
 	 * @param idx block index within file
 	 */
-	void (*bmap) (fuse_req_t req, fuse_ino_t ino, size_t blocksize,
+	void (*bmap) (tmfs_req_t req, tmfs_ino_t ino, size_t blocksize,
 		      uint64_t idx);
 
 	/**
 	 * Ioctl
 	 *
-	 * Note: For unrestricted ioctls (not allowed for FUSE
+	 * Note: For unrestricted ioctls (not allowed for TMFS
 	 * servers), data in and out areas can be discovered by giving
-	 * iovs and setting FUSE_IOCTL_RETRY in @flags.  For
+	 * iovs and setting TMFS_IOCTL_RETRY in @flags.  For
 	 * restricted ioctls, kernel prepares in/out data area
 	 * according to the information encoded in cmd.
 	 *
 	 * Introduced in version 2.8
 	 *
 	 * Valid replies:
-	 *   fuse_reply_ioctl_retry
-	 *   fuse_reply_ioctl
-	 *   fuse_reply_ioctl_iov
-	 *   fuse_reply_err
+	 *   tmfs_reply_ioctl_retry
+	 *   tmfs_reply_ioctl
+	 *   tmfs_reply_ioctl_iov
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param cmd ioctl command
 	 * @param arg ioctl argument
 	 * @param fi file information
-	 * @param flags for FUSE_IOCTL_* flags
+	 * @param flags for TMFS_IOCTL_* flags
 	 * @param in_buf data fetched from the caller
 	 * @param in_bufsz number of fetched bytes
 	 * @param out_bufsz maximum size of output data
 	 */
-	void (*ioctl) (fuse_req_t req, fuse_ino_t ino, int cmd, void *arg,
-		       struct fuse_file_info *fi, unsigned flags,
+	void (*ioctl) (tmfs_req_t req, tmfs_ino_t ino, int cmd, void *arg,
+		       struct tmfs_file_info *fi, unsigned flags,
 		       const void *in_buf, size_t in_bufsz, size_t out_bufsz);
 
 	/**
@@ -897,7 +897,7 @@ struct fuse_lowlevel_ops {
 	 *
 	 * Note: If ph is non-NULL, the client should notify
 	 * when IO readiness events occur by calling
-	 * fuse_lowelevel_notify_poll() with the specified ph.
+	 * tmfs_lowelevel_notify_poll() with the specified ph.
 	 *
 	 * Regardless of the number of times poll with a non-NULL ph
 	 * is received, single notification is enough to clear all.
@@ -905,34 +905,34 @@ struct fuse_lowlevel_ops {
 	 * correctness.
 	 *
 	 * The callee is responsible for destroying ph with
-	 * fuse_pollhandle_destroy() when no longer in use.
+	 * tmfs_pollhandle_destroy() when no longer in use.
 	 *
 	 * Valid replies:
-	 *   fuse_reply_poll
-	 *   fuse_reply_err
+	 *   tmfs_reply_poll
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param fi file information
 	 * @param ph poll handle to be used for notification
 	 */
-	void (*poll) (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
-		      struct fuse_pollhandle *ph);
+	void (*poll) (tmfs_req_t req, tmfs_ino_t ino, struct tmfs_file_info *fi,
+		      struct tmfs_pollhandle *ph);
 
 	/**
 	 * Write data made available in a buffer
 	 *
 	 * This is a more generic version of the ->write() method.  If
-	 * FUSE_CAP_SPLICE_READ is set in fuse_conn_info.want and the
-	 * kernel supports splicing from the fuse device, then the
+	 * TMFS_CAP_SPLICE_READ is set in tmfs_conn_info.want and the
+	 * kernel supports splicing from the tmfs device, then the
 	 * data will be made available in pipe for supporting zero
 	 * copy data transfer.
 	 *
 	 * Introduced in version 2.9
 	 *
 	 * Valid replies:
-	 *   fuse_reply_write
-	 *   fuse_reply_err
+	 *   tmfs_reply_write
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
@@ -940,9 +940,9 @@ struct fuse_lowlevel_ops {
 	 * @param off offset to write to
 	 * @param fi file information
 	 */
-	void (*write_buf) (fuse_req_t req, fuse_ino_t ino,
-			   struct fuse_bufvec *bufv, off_t off,
-			   struct fuse_file_info *fi);
+	void (*write_buf) (tmfs_req_t req, tmfs_ino_t ino,
+			   struct tmfs_bufvec *bufv, off_t off,
+			   struct tmfs_file_info *fi);
 
 	/**
 	 * Callback function for the retrieve request
@@ -950,16 +950,16 @@ struct fuse_lowlevel_ops {
 	 * Introduced in version 2.9
 	 *
 	 * Valid replies:
-	 *	fuse_reply_none
+	 *	tmfs_reply_none
 	 *
 	 * @param req request handle
-	 * @param cookie user data supplied to fuse_lowlevel_notify_retrieve()
-	 * @param ino the inode number supplied to fuse_lowlevel_notify_retrieve()
-	 * @param offset the offset supplied to fuse_lowlevel_notify_retrieve()
+	 * @param cookie user data supplied to tmfs_lowlevel_notify_retrieve()
+	 * @param ino the inode number supplied to tmfs_lowlevel_notify_retrieve()
+	 * @param offset the offset supplied to tmfs_lowlevel_notify_retrieve()
 	 * @param bufv the buffer containing the returned data
 	 */
-	void (*retrieve_reply) (fuse_req_t req, void *cookie, fuse_ino_t ino,
-				off_t offset, struct fuse_bufvec *bufv);
+	void (*retrieve_reply) (tmfs_req_t req, void *cookie, tmfs_ino_t ino,
+				off_t offset, struct tmfs_bufvec *bufv);
 
 	/**
 	 * Forget about multiple inodes
@@ -970,12 +970,12 @@ struct fuse_lowlevel_ops {
 	 * Introduced in version 2.9
 	 *
 	 * Valid replies:
-	 *   fuse_reply_none
+	 *   tmfs_reply_none
 	 *
 	 * @param req request handle
 	 */
-	void (*forget_multi) (fuse_req_t req, size_t count,
-			      struct fuse_forget_data *forgets);
+	void (*forget_multi) (tmfs_req_t req, size_t count,
+			      struct tmfs_forget_data *forgets);
 
 	/**
 	 * Acquire, modify or release a BSD file lock
@@ -987,15 +987,15 @@ struct fuse_lowlevel_ops {
 	 * Introduced in version 2.9
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
 	 * @param fi file information
 	 * @param op the locking operation, see flock(2)
 	 */
-	void (*flock) (fuse_req_t req, fuse_ino_t ino,
-		       struct fuse_file_info *fi, int op);
+	void (*flock) (tmfs_req_t req, tmfs_ino_t ino,
+		       struct tmfs_file_info *fi, int op);
 
 	/**
 	 * Allocate requested space. If this function returns success then
@@ -1005,7 +1005,7 @@ struct fuse_lowlevel_ops {
 	 * Introduced in version 2.9
 	 *
 	 * Valid replies:
-	 *   fuse_reply_err
+	 *   tmfs_reply_err
 	 *
 	 * @param req request handle
 	 * @param ino the inode number
@@ -1014,8 +1014,8 @@ struct fuse_lowlevel_ops {
 	 * @param mode determines the operation to be performed on the given range,
 	 *             see fallocate(2)
 	 */
-	void (*fallocate) (fuse_req_t req, fuse_ino_t ino, int mode,
-		       off_t offset, off_t length, struct fuse_file_info *fi);
+	void (*fallocate) (tmfs_req_t req, tmfs_ino_t ino, int mode,
+		       off_t offset, off_t length, struct tmfs_file_info *fi);
 };
 
 /**
@@ -1031,7 +1031,7 @@ struct fuse_lowlevel_ops {
  * @param err the positive error value, or zero for success
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_err(fuse_req_t req, int err);
+int tmfs_reply_err(tmfs_req_t req, int err);
 
 /**
  * Don't send reply
@@ -1041,7 +1041,7 @@ int fuse_reply_err(fuse_req_t req, int err);
  *
  * @param req request handle
  */
-void fuse_reply_none(fuse_req_t req);
+void tmfs_reply_none(tmfs_req_t req);
 
 /**
  * Reply with a directory entry
@@ -1056,7 +1056,7 @@ void fuse_reply_none(fuse_req_t req);
  * @param e the entry parameters
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_entry(fuse_req_t req, const struct fuse_entry_param *e);
+int tmfs_reply_entry(tmfs_req_t req, const struct tmfs_entry_param *e);
 
 /**
  * Reply with a directory entry and open parameters
@@ -1075,8 +1075,8 @@ int fuse_reply_entry(fuse_req_t req, const struct fuse_entry_param *e);
  * @param fi file information
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
-		      const struct fuse_file_info *fi);
+int tmfs_reply_create(tmfs_req_t req, const struct tmfs_entry_param *e,
+		      const struct tmfs_file_info *fi);
 
 /**
  * Reply with attributes
@@ -1089,7 +1089,7 @@ int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
  * @param attr_timeout	validity timeout (in seconds) for the attributes
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
+int tmfs_reply_attr(tmfs_req_t req, const struct stat *attr,
 		    double attr_timeout);
 
 /**
@@ -1102,7 +1102,7 @@ int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
  * @param link symbolic link contents
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_readlink(fuse_req_t req, const char *link);
+int tmfs_reply_readlink(tmfs_req_t req, const char *link);
 
 /**
  * Reply with open parameters
@@ -1117,7 +1117,7 @@ int fuse_reply_readlink(fuse_req_t req, const char *link);
  * @param fi file information
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_open(fuse_req_t req, const struct fuse_file_info *fi);
+int tmfs_reply_open(tmfs_req_t req, const struct tmfs_file_info *fi);
 
 /**
  * Reply with number of bytes written
@@ -1129,7 +1129,7 @@ int fuse_reply_open(fuse_req_t req, const struct fuse_file_info *fi);
  * @param count the number of bytes written
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_write(fuse_req_t req, size_t count);
+int tmfs_reply_write(tmfs_req_t req, size_t count);
 
 /**
  * Reply with data
@@ -1142,7 +1142,7 @@ int fuse_reply_write(fuse_req_t req, size_t count);
  * @param size the size of data in bytes
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_buf(fuse_req_t req, const char *buf, size_t size);
+int tmfs_reply_buf(tmfs_req_t req, const char *buf, size_t size);
 
 /**
  * Reply with data copied/moved from buffer(s)
@@ -1155,8 +1155,8 @@ int fuse_reply_buf(fuse_req_t req, const char *buf, size_t size);
  * @param flags flags controlling the copy
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_data(fuse_req_t req, struct fuse_bufvec *bufv,
-		    enum fuse_buf_copy_flags flags);
+int tmfs_reply_data(tmfs_req_t req, struct tmfs_bufvec *bufv,
+		    enum tmfs_buf_copy_flags flags);
 
 /**
  * Reply with data vector
@@ -1169,7 +1169,7 @@ int fuse_reply_data(fuse_req_t req, struct fuse_bufvec *bufv,
  * @param count the size of vector
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_iov(fuse_req_t req, const struct iovec *iov, int count);
+int tmfs_reply_iov(tmfs_req_t req, const struct iovec *iov, int count);
 
 /**
  * Reply with filesystem statistics
@@ -1181,7 +1181,7 @@ int fuse_reply_iov(fuse_req_t req, const struct iovec *iov, int count);
  * @param stbuf filesystem statistics
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_statfs(fuse_req_t req, const struct statvfs *stbuf);
+int tmfs_reply_statfs(tmfs_req_t req, const struct statvfs *stbuf);
 
 /**
  * Reply with needed buffer size
@@ -1193,7 +1193,7 @@ int fuse_reply_statfs(fuse_req_t req, const struct statvfs *stbuf);
  * @param count the buffer size needed in bytes
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_xattr(fuse_req_t req, size_t count);
+int tmfs_reply_xattr(tmfs_req_t req, size_t count);
 
 /**
  * Reply with file lock information
@@ -1205,7 +1205,7 @@ int fuse_reply_xattr(fuse_req_t req, size_t count);
  * @param lock the lock information
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_lock(fuse_req_t req, const struct flock *lock);
+int tmfs_reply_lock(tmfs_req_t req, const struct flock *lock);
 
 /**
  * Reply with block index
@@ -1217,7 +1217,7 @@ int fuse_reply_lock(fuse_req_t req, const struct flock *lock);
  * @param idx block index within device
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_bmap(fuse_req_t req, uint64_t idx);
+int tmfs_reply_bmap(tmfs_req_t req, uint64_t idx);
 
 /* ----------------------------------------------------------- *
  * Filling a buffer in readdir				       *
@@ -1247,7 +1247,7 @@ int fuse_reply_bmap(fuse_req_t req, uint64_t idx);
  * @param off the offset of the next entry
  * @return the space needed for the entry
  */
-size_t fuse_add_direntry(fuse_req_t req, char *buf, size_t bufsize,
+size_t tmfs_add_direntry(tmfs_req_t req, char *buf, size_t bufsize,
 			 const char *name, const struct stat *stbuf,
 			 off_t off);
 
@@ -1266,7 +1266,7 @@ size_t fuse_add_direntry(fuse_req_t req, char *buf, size_t bufsize,
  * @param out_count number of entries in out_iov
  * @return zero for success, -errno for failure to send reply
  */
-int fuse_reply_ioctl_retry(fuse_req_t req,
+int tmfs_reply_ioctl_retry(tmfs_req_t req,
 			   const struct iovec *in_iov, size_t in_count,
 			   const struct iovec *out_iov, size_t out_count);
 
@@ -1281,7 +1281,7 @@ int fuse_reply_ioctl_retry(fuse_req_t req,
  * @param buf buffer containing output data
  * @param size length of output data
  */
-int fuse_reply_ioctl(fuse_req_t req, int result, const void *buf, size_t size);
+int tmfs_reply_ioctl(tmfs_req_t req, int result, const void *buf, size_t size);
 
 /**
  * Reply to finish ioctl with iov buffer
@@ -1294,7 +1294,7 @@ int fuse_reply_ioctl(fuse_req_t req, int result, const void *buf, size_t size);
  * @param iov the vector containing the data
  * @param count the size of vector
  */
-int fuse_reply_ioctl_iov(fuse_req_t req, int result, const struct iovec *iov,
+int tmfs_reply_ioctl_iov(tmfs_req_t req, int result, const struct iovec *iov,
 			 int count);
 
 /**
@@ -1303,7 +1303,7 @@ int fuse_reply_ioctl_iov(fuse_req_t req, int result, const struct iovec *iov,
  * @param req request handle
  * @param revents poll result event mask
  */
-int fuse_reply_poll(fuse_req_t req, unsigned revents);
+int tmfs_reply_poll(tmfs_req_t req, unsigned revents);
 
 /* ----------------------------------------------------------- *
  * Notification						       *
@@ -1316,7 +1316,7 @@ int fuse_reply_poll(fuse_req_t req, unsigned revents);
  *
  * @param ph poll handle to notify IO readiness event for
  */
-int fuse_lowlevel_notify_poll(struct fuse_pollhandle *ph);
+int tmfs_lowlevel_notify_poll(struct tmfs_pollhandle *ph);
 
 /**
  * Notify to invalidate cache for an inode
@@ -1328,7 +1328,7 @@ int fuse_lowlevel_notify_poll(struct fuse_pollhandle *ph);
  * @param len the amount of cache to invalidate or 0 for all
  * @return zero for success, -errno for failure
  */
-int fuse_lowlevel_notify_inval_inode(struct fuse_chan *ch, fuse_ino_t ino,
+int tmfs_lowlevel_notify_inval_inode(struct tmfs_chan *ch, tmfs_ino_t ino,
                                      off_t off, off_t len);
 
 /**
@@ -1345,7 +1345,7 @@ int fuse_lowlevel_notify_inval_inode(struct fuse_chan *ch, fuse_ino_t ino,
  * @param namelen strlen() of file name
  * @return zero for success, -errno for failure
  */
-int fuse_lowlevel_notify_inval_entry(struct fuse_chan *ch, fuse_ino_t parent,
+int tmfs_lowlevel_notify_inval_entry(struct tmfs_chan *ch, tmfs_ino_t parent,
                                      const char *name, size_t namelen);
 
 /**
@@ -1364,8 +1364,8 @@ int fuse_lowlevel_notify_inval_entry(struct fuse_chan *ch, fuse_ino_t parent,
  * @param namelen strlen() of file name
  * @return zero for success, -errno for failure
  */
-int fuse_lowlevel_notify_delete(struct fuse_chan *ch,
-				fuse_ino_t parent, fuse_ino_t child,
+int tmfs_lowlevel_notify_delete(struct tmfs_chan *ch,
+				tmfs_ino_t parent, tmfs_ino_t child,
 				const char *name, size_t namelen);
 
 /**
@@ -1389,9 +1389,9 @@ int fuse_lowlevel_notify_delete(struct fuse_chan *ch,
  * @param flags flags controlling the copy
  * @return zero for success, -errno for failure
  */
-int fuse_lowlevel_notify_store(struct fuse_chan *ch, fuse_ino_t ino,
-			       off_t offset, struct fuse_bufvec *bufv,
-			       enum fuse_buf_copy_flags flags);
+int tmfs_lowlevel_notify_store(struct tmfs_chan *ch, tmfs_ino_t ino,
+			       off_t offset, struct tmfs_bufvec *bufv,
+			       enum tmfs_buf_copy_flags flags);
 /**
  * Retrieve data from the kernel buffers
  *
@@ -1417,7 +1417,7 @@ int fuse_lowlevel_notify_store(struct fuse_chan *ch, fuse_ino_t ino,
  * @param cookie user data to supply to the reply callback
  * @return zero for success, -errno for failure
  */
-int fuse_lowlevel_notify_retrieve(struct fuse_chan *ch, fuse_ino_t ino,
+int tmfs_lowlevel_notify_retrieve(struct tmfs_chan *ch, tmfs_ino_t ino,
 				  size_t size, off_t offset, void *cookie);
 
 
@@ -1429,9 +1429,9 @@ int fuse_lowlevel_notify_retrieve(struct fuse_chan *ch, fuse_ino_t ino,
  * Get the userdata from the request
  *
  * @param req request handle
- * @return the user data passed to fuse_lowlevel_new()
+ * @return the user data passed to tmfs_lowlevel_new()
  */
-void *fuse_req_userdata(fuse_req_t req);
+void *tmfs_req_userdata(tmfs_req_t req);
 
 /**
  * Get the context from the request
@@ -1442,7 +1442,7 @@ void *fuse_req_userdata(fuse_req_t req);
  * @param req request handle
  * @return the context structure
  */
-const struct fuse_ctx *fuse_req_ctx(fuse_req_t req);
+const struct tmfs_ctx *tmfs_req_ctx(tmfs_req_t req);
 
 /**
  * Get the current supplementary group IDs for the specified request
@@ -1451,7 +1451,7 @@ const struct fuse_ctx *fuse_req_ctx(fuse_req_t req);
  * always the total number of group IDs, even if it is larger than the
  * specified size.
  *
- * The current fuse kernel module in linux (as of 2.6.30) doesn't pass
+ * The current tmfs kernel module in linux (as of 2.6.30) doesn't pass
  * the group list to userspace, hence this function needs to parse
  * "/proc/$TID/task/$TID/status" to get the group IDs.
  *
@@ -1463,7 +1463,7 @@ const struct fuse_ctx *fuse_req_ctx(fuse_req_t req);
  * @param list array of group IDs to be filled in
  * @return the total number of supplementary group IDs or -errno on failure
  */
-int fuse_req_getgroups(fuse_req_t req, int size, gid_t list[]);
+int tmfs_req_getgroups(tmfs_req_t req, int size, gid_t list[]);
 
 /**
  * Callback function for an interrupt
@@ -1471,7 +1471,7 @@ int fuse_req_getgroups(fuse_req_t req, int size, gid_t list[]);
  * @param req interrupted request
  * @param data user data
  */
-typedef void (*fuse_interrupt_func_t)(fuse_req_t req, void *data);
+typedef void (*tmfs_interrupt_func_t)(tmfs_req_t req, void *data);
 
 /**
  * Register/unregister callback for an interrupt
@@ -1484,7 +1484,7 @@ typedef void (*fuse_interrupt_func_t)(fuse_req_t req, void *data);
  * @param func the callback function or NULL for unregister
  * @param data user data passed to the callback function
  */
-void fuse_req_interrupt_func(fuse_req_t req, fuse_interrupt_func_t func,
+void tmfs_req_interrupt_func(tmfs_req_t req, tmfs_interrupt_func_t func,
 			     void *data);
 
 /**
@@ -1493,26 +1493,26 @@ void fuse_req_interrupt_func(fuse_req_t req, fuse_interrupt_func_t func,
  * @param req request handle
  * @return 1 if the request has been interrupted, 0 otherwise
  */
-int fuse_req_interrupted(fuse_req_t req);
+int tmfs_req_interrupted(tmfs_req_t req);
 
 /* ----------------------------------------------------------- *
  * Filesystem setup					       *
  * ----------------------------------------------------------- */
 
 /* Deprecated, don't use */
-int fuse_lowlevel_is_lib_option(const char *opt);
+int tmfs_lowlevel_is_lib_option(const char *opt);
 
 /**
  * Create a low level session
  *
  * @param args argument vector
  * @param op the low level filesystem operations
- * @param op_size sizeof(struct fuse_lowlevel_ops)
+ * @param op_size sizeof(struct tmfs_lowlevel_ops)
  * @param userdata user data
  * @return the created session object, or NULL on failure
  */
-struct fuse_session *fuse_lowlevel_new(struct fuse_args *args,
-				       const struct fuse_lowlevel_ops *op,
+struct tmfs_session *tmfs_lowlevel_new(struct tmfs_args *args,
+				       const struct tmfs_lowlevel_ops *op,
 				       size_t op_size, void *userdata);
 
 /* ----------------------------------------------------------- *
@@ -1524,22 +1524,22 @@ struct fuse_session *fuse_lowlevel_new(struct fuse_args *args,
  *
  * This is used in session creation
  */
-struct fuse_session_ops {
+struct tmfs_session_ops {
 	/**
 	 * Hook to process a request (mandatory)
 	 *
-	 * @param data user data passed to fuse_session_new()
+	 * @param data user data passed to tmfs_session_new()
 	 * @param buf buffer containing the raw request
 	 * @param len request length
 	 * @param ch channel on which the request was received
 	 */
 	void (*process) (void *data, const char *buf, size_t len,
-			 struct fuse_chan *ch);
+			 struct tmfs_chan *ch);
 
 	/**
 	 * Hook for session exit and reset (optional)
 	 *
-	 * @param data user data passed to fuse_session_new()
+	 * @param data user data passed to tmfs_session_new()
 	 * @param val exited status (1 - exited, 0 - not exited)
 	 */
 	void (*exit) (void *data, int val);
@@ -1547,7 +1547,7 @@ struct fuse_session_ops {
 	/**
 	 * Hook for querying the current exited status (optional)
 	 *
-	 * @param data user data passed to fuse_session_new()
+	 * @param data user data passed to tmfs_session_new()
 	 * @return 1 if exited, 0 if not exited
 	 */
 	int (*exited) (void *data);
@@ -1555,7 +1555,7 @@ struct fuse_session_ops {
 	/**
 	 * Hook for cleaning up the channel on destroy (optional)
 	 *
-	 * @param data user data passed to fuse_session_new()
+	 * @param data user data passed to tmfs_session_new()
 	 */
 	void (*destroy) (void *data);
 };
@@ -1567,7 +1567,7 @@ struct fuse_session_ops {
  * @param data user data
  * @return new session object, or NULL on failure
  */
-struct fuse_session *fuse_session_new(struct fuse_session_ops *op, void *data);
+struct tmfs_session *tmfs_session_new(struct tmfs_session_ops *op, void *data);
 
 /**
  * Assign a channel to a session
@@ -1580,7 +1580,7 @@ struct fuse_session *fuse_session_new(struct fuse_session_ops *op, void *data);
  * @param se the session
  * @param ch the channel
  */
-void fuse_session_add_chan(struct fuse_session *se, struct fuse_chan *ch);
+void tmfs_session_add_chan(struct tmfs_session *se, struct tmfs_chan *ch);
 
 /**
  * Remove a channel from a session
@@ -1589,7 +1589,7 @@ void fuse_session_add_chan(struct fuse_session *se, struct fuse_chan *ch);
  *
  * @param ch the channel to remove
  */
-void fuse_session_remove_chan(struct fuse_chan *ch);
+void tmfs_session_remove_chan(struct tmfs_chan *ch);
 
 /**
  * Iterate over the channels assigned to a session
@@ -1602,8 +1602,8 @@ void fuse_session_remove_chan(struct fuse_chan *ch);
  * @param ch the previous channel, or NULL
  * @return the next channel, or NULL if no more channels exist
  */
-struct fuse_chan *fuse_session_next_chan(struct fuse_session *se,
-					 struct fuse_chan *ch);
+struct tmfs_chan *tmfs_session_next_chan(struct tmfs_session *se,
+					 struct tmfs_chan *ch);
 
 /**
  * Process a raw request
@@ -1613,57 +1613,57 @@ struct fuse_chan *fuse_session_next_chan(struct fuse_session *se,
  * @param len request length
  * @param ch channel on which the request was received
  */
-void fuse_session_process(struct fuse_session *se, const char *buf, size_t len,
-			  struct fuse_chan *ch);
+void tmfs_session_process(struct tmfs_session *se, const char *buf, size_t len,
+			  struct tmfs_chan *ch);
 
 /**
  * Process a raw request supplied in a generic buffer
  *
- * This is a more generic version of fuse_session_process().  The
- * fuse_buf may contain a memory buffer or a pipe file descriptor.
+ * This is a more generic version of tmfs_session_process().  The
+ * tmfs_buf may contain a memory buffer or a pipe file descriptor.
  *
  * @param se the session
- * @param buf the fuse_buf containing the request
+ * @param buf the tmfs_buf containing the request
  * @param ch channel on which the request was received
  */
-void fuse_session_process_buf(struct fuse_session *se,
-			      const struct fuse_buf *buf, struct fuse_chan *ch);
+void tmfs_session_process_buf(struct tmfs_session *se,
+			      const struct tmfs_buf *buf, struct tmfs_chan *ch);
 
 /**
  * Receive a raw request supplied in a generic buffer
  *
- * This is a more generic version of fuse_chan_recv().  The fuse_buf
+ * This is a more generic version of tmfs_chan_recv().  The tmfs_buf
  * supplied to this function contains a suitably allocated memory
  * buffer.  This may be overwritten with a file descriptor buffer.
  *
  * @param se the session
- * @param buf the fuse_buf to store the request in
+ * @param buf the tmfs_buf to store the request in
  * @param chp pointer to the channel
  * @return the actual size of the raw request, or -errno on error
  */
-int fuse_session_receive_buf(struct fuse_session *se, struct fuse_buf *buf,
-			     struct fuse_chan **chp);
+int tmfs_session_receive_buf(struct tmfs_session *se, struct tmfs_buf *buf,
+			     struct tmfs_chan **chp);
 
 /**
  * Destroy a session
  *
  * @param se the session
  */
-void fuse_session_destroy(struct fuse_session *se);
+void tmfs_session_destroy(struct tmfs_session *se);
 
 /**
  * Exit a session
  *
  * @param se the session
  */
-void fuse_session_exit(struct fuse_session *se);
+void tmfs_session_exit(struct tmfs_session *se);
 
 /**
  * Reset the exited status of a session
  *
  * @param se the session
  */
-void fuse_session_reset(struct fuse_session *se);
+void tmfs_session_reset(struct tmfs_session *se);
 
 /**
  * Query the exited status of a session
@@ -1671,7 +1671,7 @@ void fuse_session_reset(struct fuse_session *se);
  * @param se the session
  * @return 1 if exited, 0 if not exited
  */
-int fuse_session_exited(struct fuse_session *se);
+int tmfs_session_exited(struct tmfs_session *se);
 
 /**
  * Get the user data provided to the session
@@ -1679,7 +1679,7 @@ int fuse_session_exited(struct fuse_session *se);
  * @param se the session
  * @return the user data
  */
-void *fuse_session_data(struct fuse_session *se);
+void *tmfs_session_data(struct tmfs_session *se);
 
 /**
  * Enter a single threaded event loop
@@ -1687,7 +1687,7 @@ void *fuse_session_data(struct fuse_session *se);
  * @param se the session
  * @return 0 on success, -1 on error
  */
-int fuse_session_loop(struct fuse_session *se);
+int tmfs_session_loop(struct tmfs_session *se);
 
 /**
  * Enter a multi-threaded event loop
@@ -1695,7 +1695,7 @@ int fuse_session_loop(struct fuse_session *se);
  * @param se the session
  * @return 0 on success, -1 on error
  */
-int fuse_session_loop_mt(struct fuse_session *se);
+int tmfs_session_loop_mt(struct tmfs_session *se);
 
 /* ----------------------------------------------------------- *
  * Channel interface					       *
@@ -1706,7 +1706,7 @@ int fuse_session_loop_mt(struct fuse_session *se);
  *
  * This is used in channel creation
  */
-struct fuse_chan_ops {
+struct tmfs_chan_ops {
 	/**
 	 * Hook for receiving a raw request
 	 *
@@ -1715,7 +1715,7 @@ struct fuse_chan_ops {
 	 * @param size the size of the buffer
 	 * @return the actual size of the raw request, or -1 on error
 	 */
-	int (*receive)(struct fuse_chan **chp, char *buf, size_t size);
+	int (*receive)(struct tmfs_chan **chp, char *buf, size_t size);
 
 	/**
 	 * Hook for sending a raw reply
@@ -1728,7 +1728,7 @@ struct fuse_chan_ops {
 	 * @param count the number of blocks in vector
 	 * @return zero on success, -errno on failure
 	 */
-	int (*send)(struct fuse_chan *ch, const struct iovec iov[],
+	int (*send)(struct tmfs_chan *ch, const struct iovec iov[],
 		    size_t count);
 
 	/**
@@ -1736,7 +1736,7 @@ struct fuse_chan_ops {
 	 *
 	 * @param ch the channel
 	 */
-	void (*destroy)(struct fuse_chan *ch);
+	void (*destroy)(struct tmfs_chan *ch);
 };
 
 /**
@@ -1748,32 +1748,32 @@ struct fuse_chan_ops {
  * @param data user data
  * @return the new channel object, or NULL on failure
  */
-struct fuse_chan *fuse_chan_new(struct fuse_chan_ops *op, int fd,
+struct tmfs_chan *tmfs_chan_new(struct tmfs_chan_ops *op, int fd,
 				size_t bufsize, void *data);
 
 /**
  * Query the file descriptor of the channel
  *
  * @param ch the channel
- * @return the file descriptor passed to fuse_chan_new()
+ * @return the file descriptor passed to tmfs_chan_new()
  */
-int fuse_chan_fd(struct fuse_chan *ch);
+int tmfs_chan_fd(struct tmfs_chan *ch);
 
 /**
  * Query the minimal receive buffer size
  *
  * @param ch the channel
- * @return the buffer size passed to fuse_chan_new()
+ * @return the buffer size passed to tmfs_chan_new()
  */
-size_t fuse_chan_bufsize(struct fuse_chan *ch);
+size_t tmfs_chan_bufsize(struct tmfs_chan *ch);
 
 /**
  * Query the user data
  *
  * @param ch the channel
- * @return the user data passed to fuse_chan_new()
+ * @return the user data passed to tmfs_chan_new()
  */
-void *fuse_chan_data(struct fuse_chan *ch);
+void *tmfs_chan_data(struct tmfs_chan *ch);
 
 /**
  * Query the session to which this channel is assigned
@@ -1781,7 +1781,7 @@ void *fuse_chan_data(struct fuse_chan *ch);
  * @param ch the channel
  * @return the session, or NULL if the channel is not assigned
  */
-struct fuse_session *fuse_chan_session(struct fuse_chan *ch);
+struct tmfs_session *tmfs_chan_session(struct tmfs_chan *ch);
 
 /**
  * Receive a raw request
@@ -1793,7 +1793,7 @@ struct fuse_session *fuse_chan_session(struct fuse_chan *ch);
  * @param size the size of the buffer
  * @return the actual size of the raw request, or -errno on error
  */
-int fuse_chan_recv(struct fuse_chan **ch, char *buf, size_t size);
+int tmfs_chan_recv(struct tmfs_chan **ch, char *buf, size_t size);
 
 /**
  * Send a raw reply
@@ -1806,7 +1806,7 @@ int fuse_chan_recv(struct fuse_chan **ch, char *buf, size_t size);
  * @param count the number of blocks in vector
  * @return zero on success, -errno on failure
  */
-int fuse_chan_send(struct fuse_chan *ch, const struct iovec iov[],
+int tmfs_chan_send(struct tmfs_chan *ch, const struct iovec iov[],
 		   size_t count);
 
 /**
@@ -1814,25 +1814,25 @@ int fuse_chan_send(struct fuse_chan *ch, const struct iovec iov[],
  *
  * @param ch the channel
  */
-void fuse_chan_destroy(struct fuse_chan *ch);
+void tmfs_chan_destroy(struct tmfs_chan *ch);
 
 /* ----------------------------------------------------------- *
  * Compatibility stuff					       *
  * ----------------------------------------------------------- */
 
-#if FUSE_USE_VERSION < 26
-#  include "fuse_lowlevel_compat.h"
-#  define fuse_chan_ops fuse_chan_ops_compat24
-#  define fuse_chan_new fuse_chan_new_compat24
-#  if FUSE_USE_VERSION == 25
-#    define fuse_lowlevel_ops fuse_lowlevel_ops_compat25
-#    define fuse_lowlevel_new fuse_lowlevel_new_compat25
-#  elif FUSE_USE_VERSION == 24
-#    define fuse_lowlevel_ops fuse_lowlevel_ops_compat
-#    define fuse_lowlevel_new fuse_lowlevel_new_compat
-#    define fuse_file_info fuse_file_info_compat
-#    define fuse_reply_statfs fuse_reply_statfs_compat
-#    define fuse_reply_open fuse_reply_open_compat
+#if TMFS_USE_VERSION < 26
+#  include "tmfs_lowlevel_compat.h"
+#  define tmfs_chan_ops tmfs_chan_ops_compat24
+#  define tmfs_chan_new tmfs_chan_new_compat24
+#  if TMFS_USE_VERSION == 25
+#    define tmfs_lowlevel_ops tmfs_lowlevel_ops_compat25
+#    define tmfs_lowlevel_new tmfs_lowlevel_new_compat25
+#  elif TMFS_USE_VERSION == 24
+#    define tmfs_lowlevel_ops tmfs_lowlevel_ops_compat
+#    define tmfs_lowlevel_new tmfs_lowlevel_new_compat
+#    define tmfs_file_info tmfs_file_info_compat
+#    define tmfs_reply_statfs tmfs_reply_statfs_compat
+#    define tmfs_reply_open tmfs_reply_open_compat
 #  else
 #    error Compatibility with low-level API version < 24 not supported
 #  endif
@@ -1842,4 +1842,4 @@ void fuse_chan_destroy(struct fuse_chan *ch);
 }
 #endif
 
-#endif /* _FUSE_LOWLEVEL_H_ */
+#endif /* _TMFS_LOWLEVEL_H_ */

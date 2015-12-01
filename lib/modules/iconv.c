@@ -1,14 +1,14 @@
 /*
-  fuse iconv module: file name charset conversion
+  tmfs iconv module: file name charset conversion
   Copyright (C) 2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU LGPLv2.
   See the file COPYING.LIB
 */
 
-#define FUSE_USE_VERSION 26
+#define TMFS_USE_VERSION 26
 
-#include <fuse.h>
+#include <tmfs.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -20,7 +20,7 @@
 #include <langinfo.h>
 
 struct iconv {
-	struct fuse_fs *next;
+	struct tmfs_fs *next;
 	pthread_mutex_t lock;
 	char *from_code;
 	char *to_code;
@@ -31,12 +31,12 @@ struct iconv {
 struct iconv_dh {
 	struct iconv *ic;
 	void *prev_buf;
-	fuse_fill_dir_t prev_filler;
+	tmfs_fill_dir_t prev_filler;
 };
 
 static struct iconv *iconv_get(void)
 {
-	return fuse_get_context()->private_data;
+	return tmfs_get_context()->private_data;
 }
 
 static int iconv_convpath(struct iconv *ic, const char *path, char **newpathp,
@@ -105,20 +105,20 @@ static int iconv_getattr(const char *path, struct stat *stbuf)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_getattr(ic->next, newpath, stbuf);
+		err = tmfs_fs_getattr(ic->next, newpath, stbuf);
 		free(newpath);
 	}
 	return err;
 }
 
 static int iconv_fgetattr(const char *path, struct stat *stbuf,
-			  struct fuse_file_info *fi)
+			  struct tmfs_file_info *fi)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_fgetattr(ic->next, newpath, stbuf, fi);
+		err = tmfs_fs_fgetattr(ic->next, newpath, stbuf, fi);
 		free(newpath);
 	}
 	return err;
@@ -130,7 +130,7 @@ static int iconv_access(const char *path, int mask)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_access(ic->next, newpath, mask);
+		err = tmfs_fs_access(ic->next, newpath, mask);
 		free(newpath);
 	}
 	return err;
@@ -142,7 +142,7 @@ static int iconv_readlink(const char *path, char *buf, size_t size)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_readlink(ic->next, newpath, buf, size);
+		err = tmfs_fs_readlink(ic->next, newpath, buf, size);
 		if (!err) {
 			char *newlink;
 			err = iconv_convpath(ic, buf, &newlink, 1);
@@ -157,13 +157,13 @@ static int iconv_readlink(const char *path, char *buf, size_t size)
 	return err;
 }
 
-static int iconv_opendir(const char *path, struct fuse_file_info *fi)
+static int iconv_opendir(const char *path, struct tmfs_file_info *fi)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_opendir(ic->next, newpath, fi);
+		err = tmfs_fs_opendir(ic->next, newpath, fi);
 		free(newpath);
 	}
 	return err;
@@ -182,8 +182,8 @@ static int iconv_dir_fill(void *buf, const char *name,
 	return res;
 }
 
-static int iconv_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-			 off_t offset, struct fuse_file_info *fi)
+static int iconv_readdir(const char *path, void *buf, tmfs_fill_dir_t filler,
+			 off_t offset, struct tmfs_file_info *fi)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
@@ -193,20 +193,20 @@ static int iconv_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		dh.ic = ic;
 		dh.prev_buf = buf;
 		dh.prev_filler = filler;
-		err = fuse_fs_readdir(ic->next, newpath, &dh, iconv_dir_fill,
+		err = tmfs_fs_readdir(ic->next, newpath, &dh, iconv_dir_fill,
 				      offset, fi);
 		free(newpath);
 	}
 	return err;
 }
 
-static int iconv_releasedir(const char *path, struct fuse_file_info *fi)
+static int iconv_releasedir(const char *path, struct tmfs_file_info *fi)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_releasedir(ic->next, newpath, fi);
+		err = tmfs_fs_releasedir(ic->next, newpath, fi);
 		free(newpath);
 	}
 	return err;
@@ -218,7 +218,7 @@ static int iconv_mknod(const char *path, mode_t mode, dev_t rdev)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_mknod(ic->next, newpath, mode, rdev);
+		err = tmfs_fs_mknod(ic->next, newpath, mode, rdev);
 		free(newpath);
 	}
 	return err;
@@ -230,7 +230,7 @@ static int iconv_mkdir(const char *path, mode_t mode)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_mkdir(ic->next, newpath, mode);
+		err = tmfs_fs_mkdir(ic->next, newpath, mode);
 		free(newpath);
 	}
 	return err;
@@ -242,7 +242,7 @@ static int iconv_unlink(const char *path)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_unlink(ic->next, newpath);
+		err = tmfs_fs_unlink(ic->next, newpath);
 		free(newpath);
 	}
 	return err;
@@ -254,7 +254,7 @@ static int iconv_rmdir(const char *path)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_rmdir(ic->next, newpath);
+		err = tmfs_fs_rmdir(ic->next, newpath);
 		free(newpath);
 	}
 	return err;
@@ -269,7 +269,7 @@ static int iconv_symlink(const char *from, const char *to)
 	if (!err) {
 		err = iconv_convpath(ic, to, &newto, 0);
 		if (!err) {
-			err = fuse_fs_symlink(ic->next, newfrom, newto);
+			err = tmfs_fs_symlink(ic->next, newfrom, newto);
 			free(newto);
 		}
 		free(newfrom);
@@ -286,7 +286,7 @@ static int iconv_rename(const char *from, const char *to)
 	if (!err) {
 		err = iconv_convpath(ic, to, &newto, 0);
 		if (!err) {
-			err = fuse_fs_rename(ic->next, newfrom, newto);
+			err = tmfs_fs_rename(ic->next, newfrom, newto);
 			free(newto);
 		}
 		free(newfrom);
@@ -303,7 +303,7 @@ static int iconv_link(const char *from, const char *to)
 	if (!err) {
 		err = iconv_convpath(ic, to, &newto, 0);
 		if (!err) {
-			err = fuse_fs_link(ic->next, newfrom, newto);
+			err = tmfs_fs_link(ic->next, newfrom, newto);
 			free(newto);
 		}
 		free(newfrom);
@@ -317,7 +317,7 @@ static int iconv_chmod(const char *path, mode_t mode)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_chmod(ic->next, newpath, mode);
+		err = tmfs_fs_chmod(ic->next, newpath, mode);
 		free(newpath);
 	}
 	return err;
@@ -329,7 +329,7 @@ static int iconv_chown(const char *path, uid_t uid, gid_t gid)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_chown(ic->next, newpath, uid, gid);
+		err = tmfs_fs_chown(ic->next, newpath, uid, gid);
 		free(newpath);
 	}
 	return err;
@@ -341,20 +341,20 @@ static int iconv_truncate(const char *path, off_t size)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_truncate(ic->next, newpath, size);
+		err = tmfs_fs_truncate(ic->next, newpath, size);
 		free(newpath);
 	}
 	return err;
 }
 
 static int iconv_ftruncate(const char *path, off_t size,
-			   struct fuse_file_info *fi)
+			   struct tmfs_file_info *fi)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_ftruncate(ic->next, newpath, size, fi);
+		err = tmfs_fs_ftruncate(ic->next, newpath, size, fi);
 		free(newpath);
 	}
 	return err;
@@ -366,58 +366,58 @@ static int iconv_utimens(const char *path, const struct timespec ts[2])
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_utimens(ic->next, newpath, ts);
+		err = tmfs_fs_utimens(ic->next, newpath, ts);
 		free(newpath);
 	}
 	return err;
 }
 
 static int iconv_create(const char *path, mode_t mode,
-			struct fuse_file_info *fi)
+			struct tmfs_file_info *fi)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_create(ic->next, newpath, mode, fi);
+		err = tmfs_fs_create(ic->next, newpath, mode, fi);
 		free(newpath);
 	}
 	return err;
 }
 
-static int iconv_open_file(const char *path, struct fuse_file_info *fi)
+static int iconv_open_file(const char *path, struct tmfs_file_info *fi)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_open(ic->next, newpath, fi);
+		err = tmfs_fs_open(ic->next, newpath, fi);
 		free(newpath);
 	}
 	return err;
 }
 
-static int iconv_read_buf(const char *path, struct fuse_bufvec **bufp,
-			  size_t size, off_t offset, struct fuse_file_info *fi)
+static int iconv_read_buf(const char *path, struct tmfs_bufvec **bufp,
+			  size_t size, off_t offset, struct tmfs_file_info *fi)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_read_buf(ic->next, newpath, bufp, size, offset, fi);
+		err = tmfs_fs_read_buf(ic->next, newpath, bufp, size, offset, fi);
 		free(newpath);
 	}
 	return err;
 }
 
-static int iconv_write_buf(const char *path, struct fuse_bufvec *buf,
-			   off_t offset, struct fuse_file_info *fi)
+static int iconv_write_buf(const char *path, struct tmfs_bufvec *buf,
+			   off_t offset, struct tmfs_file_info *fi)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_write_buf(ic->next, newpath, buf, offset, fi);
+		err = tmfs_fs_write_buf(ic->next, newpath, buf, offset, fi);
 		free(newpath);
 	}
 	return err;
@@ -429,57 +429,57 @@ static int iconv_statfs(const char *path, struct statvfs *stbuf)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_statfs(ic->next, newpath, stbuf);
+		err = tmfs_fs_statfs(ic->next, newpath, stbuf);
 		free(newpath);
 	}
 	return err;
 }
 
-static int iconv_flush(const char *path, struct fuse_file_info *fi)
+static int iconv_flush(const char *path, struct tmfs_file_info *fi)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_flush(ic->next, newpath, fi);
+		err = tmfs_fs_flush(ic->next, newpath, fi);
 		free(newpath);
 	}
 	return err;
 }
 
-static int iconv_release(const char *path, struct fuse_file_info *fi)
+static int iconv_release(const char *path, struct tmfs_file_info *fi)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_release(ic->next, newpath, fi);
+		err = tmfs_fs_release(ic->next, newpath, fi);
 		free(newpath);
 	}
 	return err;
 }
 
 static int iconv_fsync(const char *path, int isdatasync,
-		       struct fuse_file_info *fi)
+		       struct tmfs_file_info *fi)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_fsync(ic->next, newpath, isdatasync, fi);
+		err = tmfs_fs_fsync(ic->next, newpath, isdatasync, fi);
 		free(newpath);
 	}
 	return err;
 }
 
 static int iconv_fsyncdir(const char *path, int isdatasync,
-			  struct fuse_file_info *fi)
+			  struct tmfs_file_info *fi)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_fsyncdir(ic->next, newpath, isdatasync, fi);
+		err = tmfs_fs_fsyncdir(ic->next, newpath, isdatasync, fi);
 		free(newpath);
 	}
 	return err;
@@ -492,7 +492,7 @@ static int iconv_setxattr(const char *path, const char *name,
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_setxattr(ic->next, newpath, name, value, size,
+		err = tmfs_fs_setxattr(ic->next, newpath, name, value, size,
 				       flags);
 		free(newpath);
 	}
@@ -506,7 +506,7 @@ static int iconv_getxattr(const char *path, const char *name, char *value,
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_getxattr(ic->next, newpath, name, value, size);
+		err = tmfs_fs_getxattr(ic->next, newpath, name, value, size);
 		free(newpath);
 	}
 	return err;
@@ -518,7 +518,7 @@ static int iconv_listxattr(const char *path, char *list, size_t size)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_listxattr(ic->next, newpath, list, size);
+		err = tmfs_fs_listxattr(ic->next, newpath, list, size);
 		free(newpath);
 	}
 	return err;
@@ -530,32 +530,32 @@ static int iconv_removexattr(const char *path, const char *name)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_removexattr(ic->next, newpath, name);
+		err = tmfs_fs_removexattr(ic->next, newpath, name);
 		free(newpath);
 	}
 	return err;
 }
 
-static int iconv_lock(const char *path, struct fuse_file_info *fi, int cmd,
+static int iconv_lock(const char *path, struct tmfs_file_info *fi, int cmd,
 		      struct flock *lock)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_lock(ic->next, newpath, fi, cmd, lock);
+		err = tmfs_fs_lock(ic->next, newpath, fi, cmd, lock);
 		free(newpath);
 	}
 	return err;
 }
 
-static int iconv_flock(const char *path, struct fuse_file_info *fi, int op)
+static int iconv_flock(const char *path, struct tmfs_file_info *fi, int op)
 {
 	struct iconv *ic = iconv_get();
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_flock(ic->next, newpath, fi, op);
+		err = tmfs_fs_flock(ic->next, newpath, fi, op);
 		free(newpath);
 	}
 	return err;
@@ -567,23 +567,23 @@ static int iconv_bmap(const char *path, size_t blocksize, uint64_t *idx)
 	char *newpath;
 	int err = iconv_convpath(ic, path, &newpath, 0);
 	if (!err) {
-		err = fuse_fs_bmap(ic->next, newpath, blocksize, idx);
+		err = tmfs_fs_bmap(ic->next, newpath, blocksize, idx);
 		free(newpath);
 	}
 	return err;
 }
 
-static void *iconv_init(struct fuse_conn_info *conn)
+static void *iconv_init(struct tmfs_conn_info *conn)
 {
 	struct iconv *ic = iconv_get();
-	fuse_fs_init(ic->next, conn);
+	tmfs_fs_init(ic->next, conn);
 	return ic;
 }
 
 static void iconv_destroy(void *data)
 {
 	struct iconv *ic = data;
-	fuse_fs_destroy(ic->next);
+	tmfs_fs_destroy(ic->next);
 	iconv_close(ic->tofs);
 	iconv_close(ic->fromfs);
 	pthread_mutex_destroy(&ic->lock);
@@ -592,7 +592,7 @@ static void iconv_destroy(void *data)
 	free(ic);
 }
 
-static const struct fuse_operations iconv_oper = {
+static const struct tmfs_operations iconv_oper = {
 	.destroy	= iconv_destroy,
 	.init		= iconv_init,
 	.getattr	= iconv_getattr,
@@ -635,12 +635,12 @@ static const struct fuse_operations iconv_oper = {
 	.flag_nopath = 1,
 };
 
-static const struct fuse_opt iconv_opts[] = {
-	FUSE_OPT_KEY("-h", 0),
-	FUSE_OPT_KEY("--help", 0),
+static const struct tmfs_opt iconv_opts[] = {
+	TMFS_OPT_KEY("-h", 0),
+	TMFS_OPT_KEY("--help", 0),
 	{ "from_code=%s", offsetof(struct iconv, from_code), 0 },
 	{ "to_code=%s", offsetof(struct iconv, to_code), 1 },
-	FUSE_OPT_END
+	TMFS_OPT_END
 };
 
 static void iconv_help(void)
@@ -657,7 +657,7 @@ static void iconv_help(void)
 }
 
 static int iconv_opt_proc(void *data, const char *arg, int key,
-			  struct fuse_args *outargs)
+			  struct tmfs_args *outargs)
 {
 	(void) data; (void) arg; (void) outargs;
 
@@ -669,10 +669,10 @@ static int iconv_opt_proc(void *data, const char *arg, int key,
 	return 1;
 }
 
-static struct fuse_fs *iconv_new(struct fuse_args *args,
-				 struct fuse_fs *next[])
+static struct tmfs_fs *iconv_new(struct tmfs_args *args,
+				 struct tmfs_fs *next[])
 {
-	struct fuse_fs *fs;
+	struct tmfs_fs *fs;
 	struct iconv *ic;
 	char *old = NULL;
 	const char *from;
@@ -680,15 +680,15 @@ static struct fuse_fs *iconv_new(struct fuse_args *args,
 
 	ic = calloc(1, sizeof(struct iconv));
 	if (ic == NULL) {
-		fprintf(stderr, "fuse-iconv: memory allocation failed\n");
+		fprintf(stderr, "tmfs-iconv: memory allocation failed\n");
 		return NULL;
 	}
 
-	if (fuse_opt_parse(args, ic, iconv_opts, iconv_opt_proc) == -1)
+	if (tmfs_opt_parse(args, ic, iconv_opts, iconv_opt_proc) == -1)
 		goto out_free;
 
 	if (!next[0] || next[1]) {
-		fprintf(stderr, "fuse-iconv: exactly one next filesystem required\n");
+		fprintf(stderr, "tmfs-iconv: exactly one next filesystem required\n");
 		goto out_free;
 	}
 
@@ -699,13 +699,13 @@ static struct fuse_fs *iconv_new(struct fuse_args *args,
 		old = strdup(setlocale(LC_CTYPE, ""));
 	ic->tofs = iconv_open(from, to);
 	if (ic->tofs == (iconv_t) -1) {
-		fprintf(stderr, "fuse-iconv: cannot convert from %s to %s\n",
+		fprintf(stderr, "tmfs-iconv: cannot convert from %s to %s\n",
 			to, from);
 		goto out_free;
 	}
 	ic->fromfs = iconv_open(to, from);
 	if (ic->tofs == (iconv_t) -1) {
-		fprintf(stderr, "fuse-iconv: cannot convert from %s to %s\n",
+		fprintf(stderr, "tmfs-iconv: cannot convert from %s to %s\n",
 			from, to);
 		goto out_iconv_close_to;
 	}
@@ -715,7 +715,7 @@ static struct fuse_fs *iconv_new(struct fuse_args *args,
 	}
 
 	ic->next = next[0];
-	fs = fuse_fs_new(&iconv_oper, sizeof(iconv_oper), ic);
+	fs = tmfs_fs_new(&iconv_oper, sizeof(iconv_oper), ic);
 	if (!fs)
 		goto out_iconv_close_from;
 
@@ -736,4 +736,4 @@ out_free:
 	return NULL;
 }
 
-FUSE_REGISTER_MODULE(iconv, iconv_new);
+TMFS_REGISTER_MODULE(iconv, iconv_new);

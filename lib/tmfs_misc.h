@@ -1,5 +1,5 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU LGPLv2.
@@ -11,20 +11,20 @@
 
 /*
   Versioned symbols cannot be used in some cases because it
-    - confuse the dynamic linker in uClibc
+    - contmfs the dynamic linker in uClibc
     - not supported on MacOSX (in MachO binary format)
 */
 #if (!defined(__UCLIBC__) && !defined(__APPLE__))
-#define FUSE_SYMVER(x) __asm__(x)
+#define TMFS_SYMVER(x) __asm__(x)
 #else
-#define FUSE_SYMVER(x)
+#define TMFS_SYMVER(x)
 #endif
 
 #ifndef USE_UCLIBC
-#define fuse_mutex_init(mut) pthread_mutex_init(mut, NULL)
+#define tmfs_mutex_init(mut) pthread_mutex_init(mut, NULL)
 #else
 /* Is this hack still needed? */
-static inline void fuse_mutex_init(pthread_mutex_t *mut)
+static inline void tmfs_mutex_init(pthread_mutex_t *mut)
 {
 	pthread_mutexattr_t attr;
 	pthread_mutexattr_init(&attr);

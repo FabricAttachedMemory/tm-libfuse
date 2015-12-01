@@ -1,17 +1,17 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU LGPLv2.
   See the file COPYING.LIB.
 */
 
-#ifndef _FUSE_OPT_H_
-#define _FUSE_OPT_H_
+#ifndef _TMFS_OPT_H_
+#define _TMFS_OPT_H_
 
 /** @file
  *
- * This file defines the option parsing interface of FUSE
+ * This file defines the option parsing interface of TMFS
  */
 
 #ifdef __cplusplus
@@ -73,12 +73,12 @@ extern "C" {
  * If the format is "%s", memory is allocated for the string unlike
  * with scanf().
  */
-struct fuse_opt {
+struct tmfs_opt {
 	/** Matching template and optional parameter formatting */
 	const char *templ;
 
 	/**
-	 * Offset of variable within 'data' parameter of fuse_opt_parse()
+	 * Offset of variable within 'data' parameter of tmfs_opt_parse()
 	 * or -1
 	 */
 	unsigned long offset;
@@ -94,18 +94,18 @@ struct fuse_opt {
  * Key option.	In case of a match, the processing function will be
  * called with the specified key.
  */
-#define FUSE_OPT_KEY(templ, key) { templ, -1U, key }
+#define TMFS_OPT_KEY(templ, key) { templ, -1U, key }
 
 /**
- * Last option.	 An array of 'struct fuse_opt' must end with a NULL
+ * Last option.	 An array of 'struct tmfs_opt' must end with a NULL
  * template value
  */
-#define FUSE_OPT_END { NULL, 0, 0 }
+#define TMFS_OPT_END { NULL, 0, 0 }
 
 /**
  * Argument list
  */
-struct fuse_args {
+struct tmfs_args {
 	/** Argument count */
 	int argc;
 
@@ -117,15 +117,15 @@ struct fuse_args {
 };
 
 /**
- * Initializer for 'struct fuse_args'
+ * Initializer for 'struct tmfs_args'
  */
-#define FUSE_ARGS_INIT(argc, argv) { argc, argv, 0 }
+#define TMFS_ARGS_INIT(argc, argv) { argc, argv, 0 }
 
 /**
  * Key value passed to the processing function if an option did not
  * match any template
  */
-#define FUSE_OPT_KEY_OPT     -1
+#define TMFS_OPT_KEY_OPT     -1
 
 /**
  * Key value passed to the processing function for all non-options
@@ -133,7 +133,7 @@ struct fuse_args {
  * Non-options are the arguments beginning with a character other than
  * '-' or all arguments after the special '--' option
  */
-#define FUSE_OPT_KEY_NONOPT  -2
+#define TMFS_OPT_KEY_NONOPT  -2
 
 /**
  * Special key value for options to keep
@@ -141,7 +141,7 @@ struct fuse_args {
  * Argument is not passed to processing function, but behave as if the
  * processing function returned 1
  */
-#define FUSE_OPT_KEY_KEEP -3
+#define TMFS_OPT_KEY_KEEP -3
 
 /**
  * Special key value for options to discard
@@ -149,13 +149,13 @@ struct fuse_args {
  * Argument is not passed to processing function, but behave as if the
  * processing function returned zero
  */
-#define FUSE_OPT_KEY_DISCARD -4
+#define TMFS_OPT_KEY_DISCARD -4
 
 /**
  * Processing function
  *
  * This function is called if
- *    - option did not match any 'struct fuse_opt'
+ *    - option did not match any 'struct tmfs_opt'
  *    - argument is a non-option
  *    - option did match and offset was set to -1
  *
@@ -170,19 +170,19 @@ struct fuse_args {
  * The return value of this function determines whether this argument
  * is to be inserted into the output argument vector, or discarded.
  *
- * @param data is the user data passed to the fuse_opt_parse() function
+ * @param data is the user data passed to the tmfs_opt_parse() function
  * @param arg is the whole argument or option
  * @param key determines why the processing function was called
  * @param outargs the current output argument list
  * @return -1 on error, 0 if arg is to be discarded, 1 if arg should be kept
  */
-typedef int (*fuse_opt_proc_t)(void *data, const char *arg, int key,
-			       struct fuse_args *outargs);
+typedef int (*tmfs_opt_proc_t)(void *data, const char *arg, int key,
+			       struct tmfs_args *outargs);
 
 /**
  * Option parsing function
  *
- * If 'args' was returned from a previous call to fuse_opt_parse() or
+ * If 'args' was returned from a previous call to tmfs_opt_parse() or
  * it was constructed from
  *
  * A NULL 'args' is equivalent to an empty argument vector
@@ -199,8 +199,8 @@ typedef int (*fuse_opt_proc_t)(void *data, const char *arg, int key,
  * @param proc is the processing function
  * @return -1 on error, 0 on success
  */
-int fuse_opt_parse(struct fuse_args *args, void *data,
-		   const struct fuse_opt opts[], fuse_opt_proc_t proc);
+int tmfs_opt_parse(struct tmfs_args *args, void *data,
+		   const struct tmfs_opt opts[], tmfs_opt_proc_t proc);
 
 /**
  * Add an option to a comma separated option list
@@ -209,7 +209,7 @@ int fuse_opt_parse(struct fuse_args *args, void *data,
  * @param opt is the option to add
  * @return -1 on allocation error, 0 on success
  */
-int fuse_opt_add_opt(char **opts, const char *opt);
+int tmfs_opt_add_opt(char **opts, const char *opt);
 
 /**
  * Add an option, escaping commas, to a comma separated option list
@@ -218,7 +218,7 @@ int fuse_opt_add_opt(char **opts, const char *opt);
  * @param opt is the option to add
  * @return -1 on allocation error, 0 on success
  */
-int fuse_opt_add_opt_escaped(char **opts, const char *opt);
+int tmfs_opt_add_opt_escaped(char **opts, const char *opt);
 
 /**
  * Add an argument to a NULL terminated argument vector
@@ -227,7 +227,7 @@ int fuse_opt_add_opt_escaped(char **opts, const char *opt);
  * @param arg is the new argument to add
  * @return -1 on allocation error, 0 on success
  */
-int fuse_opt_add_arg(struct fuse_args *args, const char *arg);
+int tmfs_opt_add_arg(struct tmfs_args *args, const char *arg);
 
 /**
  * Add an argument at the specified position in a NULL terminated
@@ -242,7 +242,7 @@ int fuse_opt_add_arg(struct fuse_args *args, const char *arg);
  * @param arg is the new argument to add
  * @return -1 on allocation error, 0 on success
  */
-int fuse_opt_insert_arg(struct fuse_args *args, int pos, const char *arg);
+int tmfs_opt_insert_arg(struct tmfs_args *args, int pos, const char *arg);
 
 /**
  * Free the contents of argument list
@@ -251,7 +251,7 @@ int fuse_opt_insert_arg(struct fuse_args *args, int pos, const char *arg);
  *
  * @param args is the structure containing the argument list
  */
-void fuse_opt_free_args(struct fuse_args *args);
+void tmfs_opt_free_args(struct tmfs_args *args);
 
 
 /**
@@ -261,10 +261,10 @@ void fuse_opt_free_args(struct fuse_args *args);
  * @param opt is the option to match
  * @return 1 if a match is found, 0 if not
  */
-int fuse_opt_match(const struct fuse_opt opts[], const char *opt);
+int tmfs_opt_match(const struct tmfs_opt opts[], const char *opt);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _FUSE_OPT_H_ */
+#endif /* _TMFS_OPT_H_ */

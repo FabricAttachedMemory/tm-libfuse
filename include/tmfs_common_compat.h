@@ -1,5 +1,5 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU LGPLv2.
@@ -9,7 +9,7 @@
 /* these definitions provide source compatibility to prior versions.
    Do not include this file directly! */
 
-struct fuse_file_info_compat {
+struct tmfs_file_info_compat {
 	int flags;
 	unsigned long fh;
 	int writepage;
@@ -17,10 +17,10 @@ struct fuse_file_info_compat {
 	unsigned int keep_cache : 1;
 };
 
-int fuse_mount_compat25(const char *mountpoint, struct fuse_args *args);
+int tmfs_mount_compat25(const char *mountpoint, struct tmfs_args *args);
 
-int fuse_mount_compat22(const char *mountpoint, const char *opts);
+int tmfs_mount_compat22(const char *mountpoint, const char *opts);
 
-int fuse_mount_compat1(const char *mountpoint, const char *args[]);
+int tmfs_mount_compat1(const char *mountpoint, const char *args[]);
 
-void fuse_unmount_compat22(const char *mountpoint);
+void tmfs_unmount_compat22(const char *mountpoint);

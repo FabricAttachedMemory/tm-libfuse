@@ -1,5 +1,5 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU LGPLv2.
@@ -119,7 +119,7 @@ static int add_mount(const char *progname, const char *fsname,
 	return res;
 }
 
-int fuse_mnt_add_mount(const char *progname, const char *fsname,
+int tmfs_mnt_add_mount(const char *progname, const char *fsname,
 		       const char *mnt, const char *type, const char *opts)
 {
 	if (!mtab_needs_update(mnt))
@@ -178,7 +178,7 @@ static int exec_umount(const char *progname, const char *rel_mnt, int lazy)
 
 }
 
-int fuse_mnt_umount(const char *progname, const char *abs_mnt,
+int tmfs_mnt_umount(const char *progname, const char *abs_mnt,
 		    const char *rel_mnt, int lazy)
 {
 	int res;
@@ -237,7 +237,7 @@ static int remove_mount(const char *progname, const char *mnt)
 	return res;
 }
 
-int fuse_mnt_remove_mount(const char *progname, const char *mnt)
+int tmfs_mnt_remove_mount(const char *progname, const char *mnt)
 {
 	if (!mtab_needs_update(mnt))
 		return 0;
@@ -245,7 +245,7 @@ int fuse_mnt_remove_mount(const char *progname, const char *mnt)
 	return remove_mount(progname, mnt);
 }
 
-char *fuse_mnt_resolve_path(const char *progname, const char *orig)
+char *tmfs_mnt_resolve_path(const char *progname, const char *orig)
 {
 	char buf[PATH_MAX];
 	char *copy;
@@ -312,7 +312,7 @@ char *fuse_mnt_resolve_path(const char *progname, const char *orig)
 	return dst;
 }
 
-int fuse_mnt_check_empty(const char *progname, const char *mnt,
+int tmfs_mnt_check_empty(const char *progname, const char *mnt,
 			 mode_t rootmode, off_t rootsize)
 {
 	int isempty = 1;
@@ -345,7 +345,7 @@ int fuse_mnt_check_empty(const char *progname, const char *mnt,
 	return 0;
 }
 
-int fuse_mnt_check_fuseblk(void)
+int tmfs_mnt_check_tmfsblk(void)
 {
 	char buf[256];
 	FILE *f = fopen("/proc/filesystems", "r");
@@ -353,7 +353,7 @@ int fuse_mnt_check_fuseblk(void)
 		return 1;
 
 	while (fgets(buf, sizeof(buf), f))
-		if (strstr(buf, "fuseblk\n")) {
+		if (strstr(buf, "tmfsblk\n")) {
 			fclose(f);
 			return 1;
 		}

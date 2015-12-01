@@ -1,5 +1,5 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU LGPLv2.
@@ -9,12 +9,12 @@
 #define _GNU_SOURCE
 
 #include "config.h"
-#include "fuse_i.h"
-#include "fuse_kernel.h"
-#include "fuse_opt.h"
-#include "fuse_misc.h"
-#include "fuse_common_compat.h"
-#include "fuse_lowlevel_compat.h"
+#include "tmfs_i.h"
+#include "tmfs_kernel.h"
+#include "tmfs_opt.h"
+#include "tmfs_misc.h"
+#include "tmfs_common_compat.h"
+#include "tmfs_lowlevel_compat.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,20 +41,20 @@
 			const typeof( ((type *)0)->member ) *__mptr = (ptr); \
 			(type *)( (char *)__mptr - offsetof(type,member) );})
 
-struct fuse_pollhandle {
+struct tmfs_pollhandle {
 	uint64_t kh;
-	struct fuse_chan *ch;
-	struct fuse_ll *f;
+	struct tmfs_chan *ch;
+	struct tmfs_ll *f;
 };
 
 static size_t pagesize;
 
-static __attribute__((constructor)) void fuse_ll_init_pagesize(void)
+static __attribute__((constructor)) void tmfs_ll_init_pagesize(void)
 {
 	pagesize = getpagesize();
 }
 
-static void convert_stat(const struct stat *stbuf, struct fuse_attr *attr)
+static void convert_stat(const struct stat *stbuf, struct tmfs_attr *attr)
 {
 	attr->ino	= stbuf->st_ino;
 	attr->mode	= stbuf->st_mode;
@@ -73,7 +73,7 @@ static void convert_stat(const struct stat *stbuf, struct fuse_attr *attr)
 	attr->ctimensec = ST_CTIM_NSEC(stbuf);
 }
 
-static void convert_attr(const struct fuse_setattr_in *attr, struct stat *stbuf)
+static void convert_attr(const struct tmfs_setattr_in *attr, struct stat *stbuf)
 {
 	stbuf->st_mode	       = attr->mode;
 	stbuf->st_uid	       = attr->uid;
@@ -95,39 +95,39 @@ static	size_t iov_length(const struct iovec *iov, size_t count)
 	return ret;
 }
 
-static void list_init_req(struct fuse_req *req)
+static void list_init_req(struct tmfs_req *req)
 {
 	req->next = req;
 	req->prev = req;
 }
 
-static void list_del_req(struct fuse_req *req)
+static void list_del_req(struct tmfs_req *req)
 {
-	struct fuse_req *prev = req->prev;
-	struct fuse_req *next = req->next;
+	struct tmfs_req *prev = req->prev;
+	struct tmfs_req *next = req->next;
 	prev->next = next;
 	next->prev = prev;
 }
 
-static void list_add_req(struct fuse_req *req, struct fuse_req *next)
+static void list_add_req(struct tmfs_req *req, struct tmfs_req *next)
 {
-	struct fuse_req *prev = next->prev;
+	struct tmfs_req *prev = next->prev;
 	req->next = next;
 	req->prev = prev;
 	prev->next = req;
 	next->prev = req;
 }
 
-static void destroy_req(fuse_req_t req)
+static void destroy_req(tmfs_req_t req)
 {
 	pthread_mutex_destroy(&req->lock);
 	free(req);
 }
 
-void fuse_free_req(fuse_req_t req)
+void tmfs_free_req(tmfs_req_t req)
 {
 	int ctr;
-	struct fuse_ll *f = req->f;
+	struct tmfs_ll *f = req->f;
 
 	pthread_mutex_lock(&f->lock);
 	req->u.ni.func = NULL;
@@ -139,28 +139,28 @@ void fuse_free_req(fuse_req_t req)
 		destroy_req(req);
 }
 
-static struct fuse_req *fuse_ll_alloc_req(struct fuse_ll *f)
+static struct tmfs_req *tmfs_ll_alloc_req(struct tmfs_ll *f)
 {
-	struct fuse_req *req;
+	struct tmfs_req *req;
 
-	req = (struct fuse_req *) calloc(1, sizeof(struct fuse_req));
+	req = (struct tmfs_req *) calloc(1, sizeof(struct tmfs_req));
 	if (req == NULL) {
-		fprintf(stderr, "fuse: failed to allocate request\n");
+		fprintf(stderr, "tmfs: failed to allocate request\n");
 	} else {
 		req->f = f;
 		req->ctr = 1;
 		list_init_req(req);
-		fuse_mutex_init(&req->lock);
+		tmfs_mutex_init(&req->lock);
 	}
 
 	return req;
 }
 
 
-static int fuse_send_msg(struct fuse_ll *f, struct fuse_chan *ch,
+static int tmfs_send_msg(struct tmfs_ll *f, struct tmfs_chan *ch,
 			 struct iovec *iov, int count)
 {
-	struct fuse_out_header *out = iov[0].iov_base;
+	struct tmfs_out_header *out = iov[0].iov_base;
 
 	out->len = iov_length(iov, count);
 	if (f->debug) {
@@ -179,16 +179,16 @@ static int fuse_send_msg(struct fuse_ll *f, struct fuse_chan *ch,
 		}
 	}
 
-	return fuse_chan_send(ch, iov, count);
+	return tmfs_chan_send(ch, iov, count);
 }
 
-int fuse_send_reply_iov_nofree(fuse_req_t req, int error, struct iovec *iov,
+int tmfs_send_reply_iov_nofree(tmfs_req_t req, int error, struct iovec *iov,
 			       int count)
 {
-	struct fuse_out_header out;
+	struct tmfs_out_header out;
 
 	if (error <= -1000 || error > 0) {
-		fprintf(stderr, "fuse: bad error value: %i\n",	error);
+		fprintf(stderr, "tmfs: bad error value: %i\n",	error);
 		error = -ERANGE;
 	}
 
@@ -196,22 +196,22 @@ int fuse_send_reply_iov_nofree(fuse_req_t req, int error, struct iovec *iov,
 	out.error = error;
 
 	iov[0].iov_base = &out;
-	iov[0].iov_len = sizeof(struct fuse_out_header);
+	iov[0].iov_len = sizeof(struct tmfs_out_header);
 
-	return fuse_send_msg(req->f, req->ch, iov, count);
+	return tmfs_send_msg(req->f, req->ch, iov, count);
 }
 
-static int send_reply_iov(fuse_req_t req, int error, struct iovec *iov,
+static int send_reply_iov(tmfs_req_t req, int error, struct iovec *iov,
 			  int count)
 {
 	int res;
 
-	res = fuse_send_reply_iov_nofree(req, error, iov, count);
-	fuse_free_req(req);
+	res = tmfs_send_reply_iov_nofree(req, error, iov, count);
+	tmfs_free_req(req);
 	return res;
 }
 
-static int send_reply(fuse_req_t req, int error, const void *arg,
+static int send_reply(tmfs_req_t req, int error, const void *arg,
 		      size_t argsize)
 {
 	struct iovec iov[2];
@@ -224,14 +224,14 @@ static int send_reply(fuse_req_t req, int error, const void *arg,
 	return send_reply_iov(req, error, iov, count);
 }
 
-int fuse_reply_iov(fuse_req_t req, const struct iovec *iov, int count)
+int tmfs_reply_iov(tmfs_req_t req, const struct iovec *iov, int count)
 {
 	int res;
 	struct iovec *padded_iov;
 
 	padded_iov = malloc((count + 1) * sizeof(struct iovec));
 	if (padded_iov == NULL)
-		return fuse_reply_err(req, ENOMEM);
+		return tmfs_reply_err(req, ENOMEM);
 
 	memcpy(padded_iov + 1, iov, count * sizeof(struct iovec));
 	count++;
@@ -242,19 +242,19 @@ int fuse_reply_iov(fuse_req_t req, const struct iovec *iov, int count)
 	return res;
 }
 
-size_t fuse_dirent_size(size_t namelen)
+size_t tmfs_dirent_size(size_t namelen)
 {
-	return FUSE_DIRENT_ALIGN(FUSE_NAME_OFFSET + namelen);
+	return TMFS_DIRENT_ALIGN(TMFS_NAME_OFFSET + namelen);
 }
 
-char *fuse_add_dirent(char *buf, const char *name, const struct stat *stbuf,
+char *tmfs_add_dirent(char *buf, const char *name, const struct stat *stbuf,
 		      off_t off)
 {
 	unsigned namelen = strlen(name);
-	unsigned entlen = FUSE_NAME_OFFSET + namelen;
-	unsigned entsize = fuse_dirent_size(namelen);
+	unsigned entlen = TMFS_NAME_OFFSET + namelen;
+	unsigned entsize = tmfs_dirent_size(namelen);
 	unsigned padlen = entsize - entlen;
-	struct fuse_dirent *dirent = (struct fuse_dirent *) buf;
+	struct tmfs_dirent *dirent = (struct tmfs_dirent *) buf;
 
 	dirent->ino = stbuf->st_ino;
 	dirent->off = off;
@@ -267,20 +267,20 @@ char *fuse_add_dirent(char *buf, const char *name, const struct stat *stbuf,
 	return buf + entsize;
 }
 
-size_t fuse_add_direntry(fuse_req_t req, char *buf, size_t bufsize,
+size_t tmfs_add_direntry(tmfs_req_t req, char *buf, size_t bufsize,
 			 const char *name, const struct stat *stbuf, off_t off)
 {
 	size_t entsize;
 
 	(void) req;
-	entsize = fuse_dirent_size(strlen(name));
+	entsize = tmfs_dirent_size(strlen(name));
 	if (entsize <= bufsize && buf)
-		fuse_add_dirent(buf, name, stbuf, off);
+		tmfs_add_dirent(buf, name, stbuf, off);
 	return entsize;
 }
 
 static void convert_statfs(const struct statvfs *stbuf,
-			   struct fuse_kstatfs *kstatfs)
+			   struct tmfs_kstatfs *kstatfs)
 {
 	kstatfs->bsize	 = stbuf->f_bsize;
 	kstatfs->frsize	 = stbuf->f_frsize;
@@ -292,21 +292,21 @@ static void convert_statfs(const struct statvfs *stbuf,
 	kstatfs->namelen = stbuf->f_namemax;
 }
 
-static int send_reply_ok(fuse_req_t req, const void *arg, size_t argsize)
+static int send_reply_ok(tmfs_req_t req, const void *arg, size_t argsize)
 {
 	return send_reply(req, 0, arg, argsize);
 }
 
-int fuse_reply_err(fuse_req_t req, int err)
+int tmfs_reply_err(tmfs_req_t req, int err)
 {
 	return send_reply(req, -err, NULL, 0);
 }
 
-void fuse_reply_none(fuse_req_t req)
+void tmfs_reply_none(tmfs_req_t req)
 {
 	if (req->ch)
-		fuse_chan_send(req->ch, NULL, 0);
-	fuse_free_req(req);
+		tmfs_chan_send(req->ch, NULL, 0);
+	tmfs_free_req(req);
 }
 
 static unsigned long calc_timeout_sec(double t)
@@ -330,8 +330,8 @@ static unsigned int calc_timeout_nsec(double t)
 		return (unsigned int) (f * 1.0e9);
 }
 
-static void fill_entry(struct fuse_entry_out *arg,
-		       const struct fuse_entry_param *e)
+static void fill_entry(struct tmfs_entry_out *arg,
+		       const struct tmfs_entry_param *e)
 {
 	arg->nodeid = e->ino;
 	arg->generation = e->generation;
@@ -342,8 +342,8 @@ static void fill_entry(struct fuse_entry_out *arg,
 	convert_stat(&e->attr, &arg->attr);
 }
 
-static void fill_open(struct fuse_open_out *arg,
-		      const struct fuse_file_info *f)
+static void fill_open(struct tmfs_open_out *arg,
+		      const struct tmfs_file_info *f)
 {
 	arg->fh = f->fh;
 	if (f->direct_io)
@@ -354,44 +354,44 @@ static void fill_open(struct fuse_open_out *arg,
 		arg->open_flags |= FOPEN_NONSEEKABLE;
 }
 
-int fuse_reply_entry(fuse_req_t req, const struct fuse_entry_param *e)
+int tmfs_reply_entry(tmfs_req_t req, const struct tmfs_entry_param *e)
 {
-	struct fuse_entry_out arg;
+	struct tmfs_entry_out arg;
 	size_t size = req->f->conn.proto_minor < 9 ?
-		FUSE_COMPAT_ENTRY_OUT_SIZE : sizeof(arg);
+		TMFS_COMPAT_ENTRY_OUT_SIZE : sizeof(arg);
 
 	/* before ABI 7.4 e->ino == 0 was invalid, only ENOENT meant
 	   negative entry */
 	if (!e->ino && req->f->conn.proto_minor < 4)
-		return fuse_reply_err(req, ENOENT);
+		return tmfs_reply_err(req, ENOENT);
 
 	memset(&arg, 0, sizeof(arg));
 	fill_entry(&arg, e);
 	return send_reply_ok(req, &arg, size);
 }
 
-int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
-		      const struct fuse_file_info *f)
+int tmfs_reply_create(tmfs_req_t req, const struct tmfs_entry_param *e,
+		      const struct tmfs_file_info *f)
 {
-	char buf[sizeof(struct fuse_entry_out) + sizeof(struct fuse_open_out)];
+	char buf[sizeof(struct tmfs_entry_out) + sizeof(struct tmfs_open_out)];
 	size_t entrysize = req->f->conn.proto_minor < 9 ?
-		FUSE_COMPAT_ENTRY_OUT_SIZE : sizeof(struct fuse_entry_out);
-	struct fuse_entry_out *earg = (struct fuse_entry_out *) buf;
-	struct fuse_open_out *oarg = (struct fuse_open_out *) (buf + entrysize);
+		TMFS_COMPAT_ENTRY_OUT_SIZE : sizeof(struct tmfs_entry_out);
+	struct tmfs_entry_out *earg = (struct tmfs_entry_out *) buf;
+	struct tmfs_open_out *oarg = (struct tmfs_open_out *) (buf + entrysize);
 
 	memset(buf, 0, sizeof(buf));
 	fill_entry(earg, e);
 	fill_open(oarg, f);
 	return send_reply_ok(req, buf,
-			     entrysize + sizeof(struct fuse_open_out));
+			     entrysize + sizeof(struct tmfs_open_out));
 }
 
-int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
+int tmfs_reply_attr(tmfs_req_t req, const struct stat *attr,
 		    double attr_timeout)
 {
-	struct fuse_attr_out arg;
+	struct tmfs_attr_out arg;
 	size_t size = req->f->conn.proto_minor < 9 ?
-		FUSE_COMPAT_ATTR_OUT_SIZE : sizeof(arg);
+		TMFS_COMPAT_ATTR_OUT_SIZE : sizeof(arg);
 
 	memset(&arg, 0, sizeof(arg));
 	arg.attr_valid = calc_timeout_sec(attr_timeout);
@@ -401,23 +401,23 @@ int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
 	return send_reply_ok(req, &arg, size);
 }
 
-int fuse_reply_readlink(fuse_req_t req, const char *linkname)
+int tmfs_reply_readlink(tmfs_req_t req, const char *linkname)
 {
 	return send_reply_ok(req, linkname, strlen(linkname));
 }
 
-int fuse_reply_open(fuse_req_t req, const struct fuse_file_info *f)
+int tmfs_reply_open(tmfs_req_t req, const struct tmfs_file_info *f)
 {
-	struct fuse_open_out arg;
+	struct tmfs_open_out arg;
 
 	memset(&arg, 0, sizeof(arg));
 	fill_open(&arg, f);
 	return send_reply_ok(req, &arg, sizeof(arg));
 }
 
-int fuse_reply_write(fuse_req_t req, size_t count)
+int tmfs_reply_write(tmfs_req_t req, size_t count)
 {
-	struct fuse_write_out arg;
+	struct tmfs_write_out arg;
 
 	memset(&arg, 0, sizeof(arg));
 	arg.size = count;
@@ -425,30 +425,30 @@ int fuse_reply_write(fuse_req_t req, size_t count)
 	return send_reply_ok(req, &arg, sizeof(arg));
 }
 
-int fuse_reply_buf(fuse_req_t req, const char *buf, size_t size)
+int tmfs_reply_buf(tmfs_req_t req, const char *buf, size_t size)
 {
 	return send_reply_ok(req, buf, size);
 }
 
-static int fuse_send_data_iov_fallback(struct fuse_ll *f, struct fuse_chan *ch,
+static int tmfs_send_data_iov_fallback(struct tmfs_ll *f, struct tmfs_chan *ch,
 				       struct iovec *iov, int iov_count,
-				       struct fuse_bufvec *buf,
+				       struct tmfs_bufvec *buf,
 				       size_t len)
 {
-	struct fuse_bufvec mem_buf = FUSE_BUFVEC_INIT(len);
+	struct tmfs_bufvec mem_buf = TMFS_BUFVEC_INIT(len);
 	void *mbuf;
 	int res;
 
 	/* Optimize common case */
 	if (buf->count == 1 && buf->idx == 0 && buf->off == 0 &&
-	    !(buf->buf[0].flags & FUSE_BUF_IS_FD)) {
+	    !(buf->buf[0].flags & TMFS_BUF_IS_FD)) {
 		/* FIXME: also avoid memory copy if there are multiple buffers
 		   but none of them contain an fd */
 
 		iov[iov_count].iov_base = buf->buf[0].mem;
 		iov[iov_count].iov_len = len;
 		iov_count++;
-		return fuse_send_msg(f, ch, iov, iov_count);
+		return tmfs_send_msg(f, ch, iov, iov_count);
 	}
 
 	res = posix_memalign(&mbuf, pagesize, len);
@@ -456,7 +456,7 @@ static int fuse_send_data_iov_fallback(struct fuse_ll *f, struct fuse_chan *ch,
 		return res;
 
 	mem_buf.buf[0].mem = mbuf;
-	res = fuse_buf_copy(&mem_buf, buf, 0);
+	res = tmfs_buf_copy(&mem_buf, buf, 0);
 	if (res < 0) {
 		free(mbuf);
 		return -res;
@@ -466,19 +466,19 @@ static int fuse_send_data_iov_fallback(struct fuse_ll *f, struct fuse_chan *ch,
 	iov[iov_count].iov_base = mbuf;
 	iov[iov_count].iov_len = len;
 	iov_count++;
-	res = fuse_send_msg(f, ch, iov, iov_count);
+	res = tmfs_send_msg(f, ch, iov, iov_count);
 	free(mbuf);
 
 	return res;
 }
 
-struct fuse_ll_pipe {
+struct tmfs_ll_pipe {
 	size_t size;
 	int can_grow;
 	int pipe[2];
 };
 
-static void fuse_ll_pipe_free(struct fuse_ll_pipe *llp)
+static void tmfs_ll_pipe_free(struct tmfs_ll_pipe *llp)
 {
 	close(llp->pipe[0]);
 	close(llp->pipe[1]);
@@ -486,13 +486,13 @@ static void fuse_ll_pipe_free(struct fuse_ll_pipe *llp)
 }
 
 #ifdef HAVE_SPLICE
-static struct fuse_ll_pipe *fuse_ll_get_pipe(struct fuse_ll *f)
+static struct tmfs_ll_pipe *tmfs_ll_get_pipe(struct tmfs_ll *f)
 {
-	struct fuse_ll_pipe *llp = pthread_getspecific(f->pipe_key);
+	struct tmfs_ll_pipe *llp = pthread_getspecific(f->pipe_key);
 	if (llp == NULL) {
 		int res;
 
-		llp = malloc(sizeof(struct fuse_ll_pipe));
+		llp = malloc(sizeof(struct tmfs_ll_pipe));
 		if (llp == NULL)
 			return NULL;
 
@@ -523,12 +523,12 @@ static struct fuse_ll_pipe *fuse_ll_get_pipe(struct fuse_ll *f)
 }
 #endif
 
-static void fuse_ll_clear_pipe(struct fuse_ll *f)
+static void tmfs_ll_clear_pipe(struct tmfs_ll *f)
 {
-	struct fuse_ll_pipe *llp = pthread_getspecific(f->pipe_key);
+	struct tmfs_ll_pipe *llp = pthread_getspecific(f->pipe_key);
 	if (llp) {
 		pthread_setspecific(f->pipe_key, NULL);
-		fuse_ll_pipe_free(llp);
+		tmfs_ll_pipe_free(llp);
 	}
 }
 
@@ -539,40 +539,40 @@ static int read_back(int fd, char *buf, size_t len)
 
 	res = read(fd, buf, len);
 	if (res == -1) {
-		fprintf(stderr, "fuse: internal error: failed to read back from pipe: %s\n", strerror(errno));
+		fprintf(stderr, "tmfs: internal error: failed to read back from pipe: %s\n", strerror(errno));
 		return -EIO;
 	}
 	if (res != len) {
-		fprintf(stderr, "fuse: internal error: short read back from pipe: %i from %zi\n", res, len);
+		fprintf(stderr, "tmfs: internal error: short read back from pipe: %i from %zi\n", res, len);
 		return -EIO;
 	}
 	return 0;
 }
 
-static int fuse_send_data_iov(struct fuse_ll *f, struct fuse_chan *ch,
+static int tmfs_send_data_iov(struct tmfs_ll *f, struct tmfs_chan *ch,
 			       struct iovec *iov, int iov_count,
-			       struct fuse_bufvec *buf, unsigned int flags)
+			       struct tmfs_bufvec *buf, unsigned int flags)
 {
 	int res;
-	size_t len = fuse_buf_size(buf);
-	struct fuse_out_header *out = iov[0].iov_base;
-	struct fuse_ll_pipe *llp;
+	size_t len = tmfs_buf_size(buf);
+	struct tmfs_out_header *out = iov[0].iov_base;
+	struct tmfs_ll_pipe *llp;
 	int splice_flags;
 	size_t pipesize;
 	size_t total_fd_size;
 	size_t idx;
 	size_t headerlen;
-	struct fuse_bufvec pipe_buf = FUSE_BUFVEC_INIT(len);
+	struct tmfs_bufvec pipe_buf = TMFS_BUFVEC_INIT(len);
 
 	if (f->broken_splice_nonblock)
 		goto fallback;
 
-	if (flags & FUSE_BUF_NO_SPLICE)
+	if (flags & TMFS_BUF_NO_SPLICE)
 		goto fallback;
 
 	total_fd_size = 0;
 	for (idx = buf->idx; idx < buf->count; idx++) {
-		if (buf->buf[idx].flags & FUSE_BUF_IS_FD) {
+		if (buf->buf[idx].flags & TMFS_BUF_IS_FD) {
 			total_fd_size = buf->buf[idx].size;
 			if (idx == buf->idx)
 				total_fd_size -= buf->off;
@@ -582,10 +582,10 @@ static int fuse_send_data_iov(struct fuse_ll *f, struct fuse_chan *ch,
 		goto fallback;
 
 	if (f->conn.proto_minor < 14 ||
-	    !(f->conn.want & FUSE_CAP_SPLICE_WRITE))
+	    !(f->conn.want & TMFS_CAP_SPLICE_WRITE))
 		goto fallback;
 
-	llp = fuse_ll_get_pipe(f);
+	llp = tmfs_ll_get_pipe(f);
 	if (llp == NULL)
 		goto fallback;
 
@@ -620,16 +620,16 @@ static int fuse_send_data_iov(struct fuse_ll *f, struct fuse_chan *ch,
 
 	if (res != headerlen) {
 		res = -EIO;
-		fprintf(stderr, "fuse: short vmsplice to pipe: %u/%zu\n", res,
+		fprintf(stderr, "tmfs: short vmsplice to pipe: %u/%zu\n", res,
 			headerlen);
 		goto clear_pipe;
 	}
 
-	pipe_buf.buf[0].flags = FUSE_BUF_IS_FD;
+	pipe_buf.buf[0].flags = TMFS_BUF_IS_FD;
 	pipe_buf.buf[0].fd = llp->pipe[1];
 
-	res = fuse_buf_copy(&pipe_buf, buf,
-			    FUSE_BUF_FORCE_SPLICE | FUSE_BUF_SPLICE_NONBLOCK);
+	res = tmfs_buf_copy(&pipe_buf, buf,
+			    TMFS_BUF_FORCE_SPLICE | TMFS_BUF_SPLICE_NONBLOCK);
 	if (res < 0) {
 		if (res == -EAGAIN || res == -EINVAL) {
 			/*
@@ -646,7 +646,7 @@ static int fuse_send_data_iov(struct fuse_ll *f, struct fuse_chan *ch,
 				f->broken_splice_nonblock = 1;
 
 			pthread_setspecific(f->pipe_key, NULL);
-			fuse_ll_pipe_free(llp);
+			tmfs_ll_pipe_free(llp);
 			goto fallback;
 		}
 		res = -res;
@@ -654,7 +654,7 @@ static int fuse_send_data_iov(struct fuse_ll *f, struct fuse_chan *ch,
 	}
 
 	if (res != 0 && res < len) {
-		struct fuse_bufvec mem_buf = FUSE_BUFVEC_INIT(len);
+		struct tmfs_bufvec mem_buf = TMFS_BUFVEC_INIT(len);
 		void *mbuf;
 		size_t now_len = res;
 		/*
@@ -672,7 +672,7 @@ static int fuse_send_data_iov(struct fuse_ll *f, struct fuse_chan *ch,
 
 		mem_buf.buf[0].mem = mbuf;
 		mem_buf.off = now_len;
-		res = fuse_buf_copy(&mem_buf, buf, 0);
+		res = tmfs_buf_copy(&mem_buf, buf, 0);
 		if (res > 0) {
 			char *tmpbuf;
 			size_t extra_len = res;
@@ -702,7 +702,7 @@ static int fuse_send_data_iov(struct fuse_ll *f, struct fuse_chan *ch,
 			iov[iov_count].iov_base = mbuf;
 			iov[iov_count].iov_len = len;
 			iov_count++;
-			res = fuse_send_msg(f, ch, iov, iov_count);
+			res = tmfs_send_msg(f, ch, iov, iov_count);
 			free(mbuf);
 			return res;
 		}
@@ -719,71 +719,71 @@ static int fuse_send_data_iov(struct fuse_ll *f, struct fuse_chan *ch,
 	}
 
 	splice_flags = 0;
-	if ((flags & FUSE_BUF_SPLICE_MOVE) &&
-	    (f->conn.want & FUSE_CAP_SPLICE_MOVE))
+	if ((flags & TMFS_BUF_SPLICE_MOVE) &&
+	    (f->conn.want & TMFS_CAP_SPLICE_MOVE))
 		splice_flags |= SPLICE_F_MOVE;
 
 	res = splice(llp->pipe[0], NULL,
-		     fuse_chan_fd(ch), NULL, out->len, splice_flags);
+		     tmfs_chan_fd(ch), NULL, out->len, splice_flags);
 	if (res == -1) {
 		res = -errno;
-		perror("fuse: splice from pipe");
+		perror("tmfs: splice from pipe");
 		goto clear_pipe;
 	}
 	if (res != out->len) {
 		res = -EIO;
-		fprintf(stderr, "fuse: short splice from pipe: %u/%u\n",
+		fprintf(stderr, "tmfs: short splice from pipe: %u/%u\n",
 			res, out->len);
 		goto clear_pipe;
 	}
 	return 0;
 
 clear_pipe:
-	fuse_ll_clear_pipe(f);
+	tmfs_ll_clear_pipe(f);
 	return res;
 
 fallback:
-	return fuse_send_data_iov_fallback(f, ch, iov, iov_count, buf, len);
+	return tmfs_send_data_iov_fallback(f, ch, iov, iov_count, buf, len);
 }
 #else
-static int fuse_send_data_iov(struct fuse_ll *f, struct fuse_chan *ch,
+static int tmfs_send_data_iov(struct tmfs_ll *f, struct tmfs_chan *ch,
 			       struct iovec *iov, int iov_count,
-			       struct fuse_bufvec *buf, unsigned int flags)
+			       struct tmfs_bufvec *buf, unsigned int flags)
 {
-	size_t len = fuse_buf_size(buf);
+	size_t len = tmfs_buf_size(buf);
 	(void) flags;
 
-	return fuse_send_data_iov_fallback(f, ch, iov, iov_count, buf, len);
+	return tmfs_send_data_iov_fallback(f, ch, iov, iov_count, buf, len);
 }
 #endif
 
-int fuse_reply_data(fuse_req_t req, struct fuse_bufvec *bufv,
-		    enum fuse_buf_copy_flags flags)
+int tmfs_reply_data(tmfs_req_t req, struct tmfs_bufvec *bufv,
+		    enum tmfs_buf_copy_flags flags)
 {
 	struct iovec iov[2];
-	struct fuse_out_header out;
+	struct tmfs_out_header out;
 	int res;
 
 	iov[0].iov_base = &out;
-	iov[0].iov_len = sizeof(struct fuse_out_header);
+	iov[0].iov_len = sizeof(struct tmfs_out_header);
 
 	out.unique = req->unique;
 	out.error = 0;
 
-	res = fuse_send_data_iov(req->f, req->ch, iov, 1, bufv, flags);
+	res = tmfs_send_data_iov(req->f, req->ch, iov, 1, bufv, flags);
 	if (res <= 0) {
-		fuse_free_req(req);
+		tmfs_free_req(req);
 		return res;
 	} else {
-		return fuse_reply_err(req, res);
+		return tmfs_reply_err(req, res);
 	}
 }
 
-int fuse_reply_statfs(fuse_req_t req, const struct statvfs *stbuf)
+int tmfs_reply_statfs(tmfs_req_t req, const struct statvfs *stbuf)
 {
-	struct fuse_statfs_out arg;
+	struct tmfs_statfs_out arg;
 	size_t size = req->f->conn.proto_minor < 4 ?
-		FUSE_COMPAT_STATFS_SIZE : sizeof(arg);
+		TMFS_COMPAT_STATFS_SIZE : sizeof(arg);
 
 	memset(&arg, 0, sizeof(arg));
 	convert_statfs(stbuf, &arg.st);
@@ -791,9 +791,9 @@ int fuse_reply_statfs(fuse_req_t req, const struct statvfs *stbuf)
 	return send_reply_ok(req, &arg, size);
 }
 
-int fuse_reply_xattr(fuse_req_t req, size_t count)
+int tmfs_reply_xattr(tmfs_req_t req, size_t count)
 {
-	struct fuse_getxattr_out arg;
+	struct tmfs_getxattr_out arg;
 
 	memset(&arg, 0, sizeof(arg));
 	arg.size = count;
@@ -801,9 +801,9 @@ int fuse_reply_xattr(fuse_req_t req, size_t count)
 	return send_reply_ok(req, &arg, sizeof(arg));
 }
 
-int fuse_reply_lock(fuse_req_t req, const struct flock *lock)
+int tmfs_reply_lock(tmfs_req_t req, const struct flock *lock)
 {
-	struct fuse_lk_out arg;
+	struct tmfs_lk_out arg;
 
 	memset(&arg, 0, sizeof(arg));
 	arg.lk.type = lock->l_type;
@@ -818,9 +818,9 @@ int fuse_reply_lock(fuse_req_t req, const struct flock *lock)
 	return send_reply_ok(req, &arg, sizeof(arg));
 }
 
-int fuse_reply_bmap(fuse_req_t req, uint64_t idx)
+int tmfs_reply_bmap(tmfs_req_t req, uint64_t idx)
 {
-	struct fuse_bmap_out arg;
+	struct tmfs_bmap_out arg;
 
 	memset(&arg, 0, sizeof(arg));
 	arg.block = idx;
@@ -828,10 +828,10 @@ int fuse_reply_bmap(fuse_req_t req, uint64_t idx)
 	return send_reply_ok(req, &arg, sizeof(arg));
 }
 
-static struct fuse_ioctl_iovec *fuse_ioctl_iovec_copy(const struct iovec *iov,
+static struct tmfs_ioctl_iovec *tmfs_ioctl_iovec_copy(const struct iovec *iov,
 						      size_t count)
 {
-	struct fuse_ioctl_iovec *fiov;
+	struct tmfs_ioctl_iovec *fiov;
 	size_t i;
 
 	fiov = malloc(sizeof(fiov[0]) * count);
@@ -846,19 +846,19 @@ static struct fuse_ioctl_iovec *fuse_ioctl_iovec_copy(const struct iovec *iov,
 	return fiov;
 }
 
-int fuse_reply_ioctl_retry(fuse_req_t req,
+int tmfs_reply_ioctl_retry(tmfs_req_t req,
 			   const struct iovec *in_iov, size_t in_count,
 			   const struct iovec *out_iov, size_t out_count)
 {
-	struct fuse_ioctl_out arg;
-	struct fuse_ioctl_iovec *in_fiov = NULL;
-	struct fuse_ioctl_iovec *out_fiov = NULL;
+	struct tmfs_ioctl_out arg;
+	struct tmfs_ioctl_iovec *in_fiov = NULL;
+	struct tmfs_ioctl_iovec *out_fiov = NULL;
 	struct iovec iov[4];
 	size_t count = 1;
 	int res;
 
 	memset(&arg, 0, sizeof(arg));
-	arg.flags |= FUSE_IOCTL_RETRY;
+	arg.flags |= TMFS_IOCTL_RETRY;
 	arg.in_iovs = in_count;
 	arg.out_iovs = out_count;
 	iov[count].iov_base = &arg;
@@ -880,12 +880,12 @@ int fuse_reply_ioctl_retry(fuse_req_t req,
 	} else {
 		/* Can't handle non-compat 64bit ioctls on 32bit */
 		if (sizeof(void *) == 4 && req->ioctl_64bit) {
-			res = fuse_reply_err(req, EINVAL);
+			res = tmfs_reply_err(req, EINVAL);
 			goto out;
 		}
 
 		if (in_count) {
-			in_fiov = fuse_ioctl_iovec_copy(in_iov, in_count);
+			in_fiov = tmfs_ioctl_iovec_copy(in_iov, in_count);
 			if (!in_fiov)
 				goto enomem;
 
@@ -894,7 +894,7 @@ int fuse_reply_ioctl_retry(fuse_req_t req,
 			count++;
 		}
 		if (out_count) {
-			out_fiov = fuse_ioctl_iovec_copy(out_iov, out_count);
+			out_fiov = tmfs_ioctl_iovec_copy(out_iov, out_count);
 			if (!out_fiov)
 				goto enomem;
 
@@ -912,13 +912,13 @@ out:
 	return res;
 
 enomem:
-	res = fuse_reply_err(req, ENOMEM);
+	res = tmfs_reply_err(req, ENOMEM);
 	goto out;
 }
 
-int fuse_reply_ioctl(fuse_req_t req, int result, const void *buf, size_t size)
+int tmfs_reply_ioctl(tmfs_req_t req, int result, const void *buf, size_t size)
 {
-	struct fuse_ioctl_out arg;
+	struct tmfs_ioctl_out arg;
 	struct iovec iov[3];
 	size_t count = 1;
 
@@ -937,16 +937,16 @@ int fuse_reply_ioctl(fuse_req_t req, int result, const void *buf, size_t size)
 	return send_reply_iov(req, 0, iov, count);
 }
 
-int fuse_reply_ioctl_iov(fuse_req_t req, int result, const struct iovec *iov,
+int tmfs_reply_ioctl_iov(tmfs_req_t req, int result, const struct iovec *iov,
 			 int count)
 {
 	struct iovec *padded_iov;
-	struct fuse_ioctl_out arg;
+	struct tmfs_ioctl_out arg;
 	int res;
 
 	padded_iov = malloc((count + 2) * sizeof(struct iovec));
 	if (padded_iov == NULL)
-		return fuse_reply_err(req, ENOMEM);
+		return tmfs_reply_err(req, ENOMEM);
 
 	memset(&arg, 0, sizeof(arg));
 	arg.result = result;
@@ -961,9 +961,9 @@ int fuse_reply_ioctl_iov(fuse_req_t req, int result, const struct iovec *iov,
 	return res;
 }
 
-int fuse_reply_poll(fuse_req_t req, unsigned revents)
+int tmfs_reply_poll(tmfs_req_t req, unsigned revents)
 {
-	struct fuse_poll_out arg;
+	struct tmfs_poll_out arg;
 
 	memset(&arg, 0, sizeof(arg));
 	arg.revents = revents;
@@ -971,44 +971,44 @@ int fuse_reply_poll(fuse_req_t req, unsigned revents)
 	return send_reply_ok(req, &arg, sizeof(arg));
 }
 
-static void do_lookup(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_lookup(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
 	char *name = (char *) inarg;
 
 	if (req->f->op.lookup)
 		req->f->op.lookup(req, nodeid, name);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_forget(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_forget(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_forget_in *arg = (struct fuse_forget_in *) inarg;
+	struct tmfs_forget_in *arg = (struct tmfs_forget_in *) inarg;
 
 	if (req->f->op.forget)
 		req->f->op.forget(req, nodeid, arg->nlookup);
 	else
-		fuse_reply_none(req);
+		tmfs_reply_none(req);
 }
 
-static void do_batch_forget(fuse_req_t req, fuse_ino_t nodeid,
+static void do_batch_forget(tmfs_req_t req, tmfs_ino_t nodeid,
 			    const void *inarg)
 {
-	struct fuse_batch_forget_in *arg = (void *) inarg;
-	struct fuse_forget_one *param = (void *) PARAM(arg);
+	struct tmfs_batch_forget_in *arg = (void *) inarg;
+	struct tmfs_forget_one *param = (void *) PARAM(arg);
 	unsigned int i;
 
 	(void) nodeid;
 
 	if (req->f->op.forget_multi) {
 		req->f->op.forget_multi(req, arg->count,
-				     (struct fuse_forget_data *) param);
+				     (struct tmfs_forget_data *) param);
 	} else if (req->f->op.forget) {
 		for (i = 0; i < arg->count; i++) {
-			struct fuse_forget_one *forget = &param[i];
-			struct fuse_req *dummy_req;
+			struct tmfs_forget_one *forget = &param[i];
+			struct tmfs_req *dummy_req;
 
-			dummy_req = fuse_ll_alloc_req(req->f);
+			dummy_req = tmfs_ll_alloc_req(req->f);
 			if (dummy_req == NULL)
 				break;
 
@@ -1019,21 +1019,21 @@ static void do_batch_forget(fuse_req_t req, fuse_ino_t nodeid,
 			req->f->op.forget(dummy_req, forget->nodeid,
 					  forget->nlookup);
 		}
-		fuse_reply_none(req);
+		tmfs_reply_none(req);
 	} else {
-		fuse_reply_none(req);
+		tmfs_reply_none(req);
 	}
 }
 
-static void do_getattr(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_getattr(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_file_info *fip = NULL;
-	struct fuse_file_info fi;
+	struct tmfs_file_info *fip = NULL;
+	struct tmfs_file_info fi;
 
 	if (req->f->conn.proto_minor >= 9) {
-		struct fuse_getattr_in *arg = (struct fuse_getattr_in *) inarg;
+		struct tmfs_getattr_in *arg = (struct tmfs_getattr_in *) inarg;
 
-		if (arg->getattr_flags & FUSE_GETATTR_FH) {
+		if (arg->getattr_flags & TMFS_GETATTR_FH) {
 			memset(&fi, 0, sizeof(fi));
 			fi.fh = arg->fh;
 			fi.fh_old = fi.fh;
@@ -1044,16 +1044,16 @@ static void do_getattr(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (req->f->op.getattr)
 		req->f->op.getattr(req, nodeid, fip);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_setattr(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_setattr(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_setattr_in *arg = (struct fuse_setattr_in *) inarg;
+	struct tmfs_setattr_in *arg = (struct tmfs_setattr_in *) inarg;
 
 	if (req->f->op.setattr) {
-		struct fuse_file_info *fi = NULL;
-		struct fuse_file_info fi_store;
+		struct tmfs_file_info *fi = NULL;
+		struct tmfs_file_info fi_store;
 		struct stat stbuf;
 		memset(&stbuf, 0, sizeof(stbuf));
 		convert_attr(arg, &stbuf);
@@ -1065,59 +1065,59 @@ static void do_setattr(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 			fi->fh_old = fi->fh;
 		}
 		arg->valid &=
-			FUSE_SET_ATTR_MODE	|
-			FUSE_SET_ATTR_UID	|
-			FUSE_SET_ATTR_GID	|
-			FUSE_SET_ATTR_SIZE	|
-			FUSE_SET_ATTR_ATIME	|
-			FUSE_SET_ATTR_MTIME	|
-			FUSE_SET_ATTR_ATIME_NOW	|
-			FUSE_SET_ATTR_MTIME_NOW;
+			TMFS_SET_ATTR_MODE	|
+			TMFS_SET_ATTR_UID	|
+			TMFS_SET_ATTR_GID	|
+			TMFS_SET_ATTR_SIZE	|
+			TMFS_SET_ATTR_ATIME	|
+			TMFS_SET_ATTR_MTIME	|
+			TMFS_SET_ATTR_ATIME_NOW	|
+			TMFS_SET_ATTR_MTIME_NOW;
 
 		req->f->op.setattr(req, nodeid, &stbuf, arg->valid, fi);
 	} else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_access(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_access(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_access_in *arg = (struct fuse_access_in *) inarg;
+	struct tmfs_access_in *arg = (struct tmfs_access_in *) inarg;
 
 	if (req->f->op.access)
 		req->f->op.access(req, nodeid, arg->mask);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_readlink(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_readlink(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
 	(void) inarg;
 
 	if (req->f->op.readlink)
 		req->f->op.readlink(req, nodeid);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_mknod(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_mknod(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_mknod_in *arg = (struct fuse_mknod_in *) inarg;
+	struct tmfs_mknod_in *arg = (struct tmfs_mknod_in *) inarg;
 	char *name = PARAM(arg);
 
 	if (req->f->conn.proto_minor >= 12)
 		req->ctx.umask = arg->umask;
 	else
-		name = (char *) inarg + FUSE_COMPAT_MKNOD_IN_SIZE;
+		name = (char *) inarg + TMFS_COMPAT_MKNOD_IN_SIZE;
 
 	if (req->f->op.mknod)
 		req->f->op.mknod(req, nodeid, name, arg->mode, arg->rdev);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_mkdir(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_mkdir_in *arg = (struct fuse_mkdir_in *) inarg;
+	struct tmfs_mkdir_in *arg = (struct tmfs_mkdir_in *) inarg;
 
 	if (req->f->conn.proto_minor >= 12)
 		req->ctx.umask = arg->umask;
@@ -1125,30 +1125,30 @@ static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (req->f->op.mkdir)
 		req->f->op.mkdir(req, nodeid, PARAM(arg), arg->mode);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_unlink(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_unlink(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
 	char *name = (char *) inarg;
 
 	if (req->f->op.unlink)
 		req->f->op.unlink(req, nodeid, name);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_rmdir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_rmdir(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
 	char *name = (char *) inarg;
 
 	if (req->f->op.rmdir)
 		req->f->op.rmdir(req, nodeid, name);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_symlink(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_symlink(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
 	char *name = (char *) inarg;
 	char *linkname = ((char *) inarg) + strlen((char *) inarg) + 1;
@@ -1156,37 +1156,37 @@ static void do_symlink(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (req->f->op.symlink)
 		req->f->op.symlink(req, linkname, nodeid, name);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_rename(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_rename(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_rename_in *arg = (struct fuse_rename_in *) inarg;
+	struct tmfs_rename_in *arg = (struct tmfs_rename_in *) inarg;
 	char *oldname = PARAM(arg);
 	char *newname = oldname + strlen(oldname) + 1;
 
 	if (req->f->op.rename)
 		req->f->op.rename(req, nodeid, oldname, arg->newdir, newname);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_link(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_link(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_link_in *arg = (struct fuse_link_in *) inarg;
+	struct tmfs_link_in *arg = (struct tmfs_link_in *) inarg;
 
 	if (req->f->op.link)
 		req->f->op.link(req, arg->oldnodeid, nodeid, PARAM(arg));
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_create(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_create(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_create_in *arg = (struct fuse_create_in *) inarg;
+	struct tmfs_create_in *arg = (struct tmfs_create_in *) inarg;
 
 	if (req->f->op.create) {
-		struct fuse_file_info fi;
+		struct tmfs_file_info fi;
 		char *name = PARAM(arg);
 
 		memset(&fi, 0, sizeof(fi));
@@ -1195,17 +1195,17 @@ static void do_create(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 		if (req->f->conn.proto_minor >= 12)
 			req->ctx.umask = arg->umask;
 		else
-			name = (char *) inarg + sizeof(struct fuse_open_in);
+			name = (char *) inarg + sizeof(struct tmfs_open_in);
 
 		req->f->op.create(req, nodeid, name, arg->mode, &fi);
 	} else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_open(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_open(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_open_in *arg = (struct fuse_open_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_open_in *arg = (struct tmfs_open_in *) inarg;
+	struct tmfs_file_info fi;
 
 	memset(&fi, 0, sizeof(fi));
 	fi.flags = arg->flags;
@@ -1213,15 +1213,15 @@ static void do_open(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (req->f->op.open)
 		req->f->op.open(req, nodeid, &fi);
 	else
-		fuse_reply_open(req, &fi);
+		tmfs_reply_open(req, &fi);
 }
 
-static void do_read(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_read(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_read_in *arg = (struct fuse_read_in *) inarg;
+	struct tmfs_read_in *arg = (struct tmfs_read_in *) inarg;
 
 	if (req->f->op.read) {
-		struct fuse_file_info fi;
+		struct tmfs_file_info fi;
 
 		memset(&fi, 0, sizeof(fi));
 		fi.fh = arg->fh;
@@ -1232,13 +1232,13 @@ static void do_read(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 		}
 		req->f->op.read(req, nodeid, arg->size, arg->offset, &fi);
 	} else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_write(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_write(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_write_in *arg = (struct fuse_write_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_write_in *arg = (struct tmfs_write_in *) inarg;
+	struct tmfs_file_info fi;
 	char *param;
 
 	memset(&fi, 0, sizeof(fi));
@@ -1247,7 +1247,7 @@ static void do_write(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	fi.writepage = arg->write_flags & 1;
 
 	if (req->f->conn.proto_minor < 9) {
-		param = ((char *) arg) + FUSE_COMPAT_WRITE_IN_SIZE;
+		param = ((char *) arg) + TMFS_COMPAT_WRITE_IN_SIZE;
 	} else {
 		fi.lock_owner = arg->lock_owner;
 		fi.flags = arg->flags;
@@ -1258,19 +1258,19 @@ static void do_write(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 		req->f->op.write(req, nodeid, param, arg->size,
 				 arg->offset, &fi);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_write_buf(fuse_req_t req, fuse_ino_t nodeid, const void *inarg,
-			 const struct fuse_buf *ibuf)
+static void do_write_buf(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg,
+			 const struct tmfs_buf *ibuf)
 {
-	struct fuse_ll *f = req->f;
-	struct fuse_bufvec bufv = {
+	struct tmfs_ll *f = req->f;
+	struct tmfs_bufvec bufv = {
 		.buf[0] = *ibuf,
 		.count = 1,
 	};
-	struct fuse_write_in *arg = (struct fuse_write_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_write_in *arg = (struct tmfs_write_in *) inarg;
+	struct tmfs_file_info fi;
 
 	memset(&fi, 0, sizeof(fi));
 	fi.fh = arg->fh;
@@ -1278,22 +1278,22 @@ static void do_write_buf(fuse_req_t req, fuse_ino_t nodeid, const void *inarg,
 	fi.writepage = arg->write_flags & 1;
 
 	if (req->f->conn.proto_minor < 9) {
-		bufv.buf[0].mem = ((char *) arg) + FUSE_COMPAT_WRITE_IN_SIZE;
-		bufv.buf[0].size -= sizeof(struct fuse_in_header) +
-			FUSE_COMPAT_WRITE_IN_SIZE;
-		assert(!(bufv.buf[0].flags & FUSE_BUF_IS_FD));
+		bufv.buf[0].mem = ((char *) arg) + TMFS_COMPAT_WRITE_IN_SIZE;
+		bufv.buf[0].size -= sizeof(struct tmfs_in_header) +
+			TMFS_COMPAT_WRITE_IN_SIZE;
+		assert(!(bufv.buf[0].flags & TMFS_BUF_IS_FD));
 	} else {
 		fi.lock_owner = arg->lock_owner;
 		fi.flags = arg->flags;
-		if (!(bufv.buf[0].flags & FUSE_BUF_IS_FD))
+		if (!(bufv.buf[0].flags & TMFS_BUF_IS_FD))
 			bufv.buf[0].mem = PARAM(arg);
 
-		bufv.buf[0].size -= sizeof(struct fuse_in_header) +
-			sizeof(struct fuse_write_in);
+		bufv.buf[0].size -= sizeof(struct tmfs_in_header) +
+			sizeof(struct tmfs_write_in);
 	}
 	if (bufv.buf[0].size < arg->size) {
-		fprintf(stderr, "fuse: do_write_buf: buffer size too small\n");
-		fuse_reply_err(req, EIO);
+		fprintf(stderr, "tmfs: do_write_buf: buffer size too small\n");
+		tmfs_reply_err(req, EIO);
 		goto out;
 	}
 	bufv.buf[0].size = arg->size;
@@ -1302,14 +1302,14 @@ static void do_write_buf(fuse_req_t req, fuse_ino_t nodeid, const void *inarg,
 
 out:
 	/* Need to reset the pipe if ->write_buf() didn't consume all data */
-	if ((ibuf->flags & FUSE_BUF_IS_FD) && bufv.idx < bufv.count)
-		fuse_ll_clear_pipe(f);
+	if ((ibuf->flags & TMFS_BUF_IS_FD) && bufv.idx < bufv.count)
+		tmfs_ll_clear_pipe(f);
 }
 
-static void do_flush(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_flush(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_flush_in *arg = (struct fuse_flush_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_flush_in *arg = (struct tmfs_flush_in *) inarg;
+	struct tmfs_file_info fi;
 
 	memset(&fi, 0, sizeof(fi));
 	fi.fh = arg->fh;
@@ -1321,23 +1321,23 @@ static void do_flush(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (req->f->op.flush)
 		req->f->op.flush(req, nodeid, &fi);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_release(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_release(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_release_in *arg = (struct fuse_release_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_release_in *arg = (struct tmfs_release_in *) inarg;
+	struct tmfs_file_info fi;
 
 	memset(&fi, 0, sizeof(fi));
 	fi.flags = arg->flags;
 	fi.fh = arg->fh;
 	fi.fh_old = fi.fh;
 	if (req->f->conn.proto_minor >= 8) {
-		fi.flush = (arg->release_flags & FUSE_RELEASE_FLUSH) ? 1 : 0;
+		fi.flush = (arg->release_flags & TMFS_RELEASE_FLUSH) ? 1 : 0;
 		fi.lock_owner = arg->lock_owner;
 	}
-	if (arg->release_flags & FUSE_RELEASE_FLOCK_UNLOCK) {
+	if (arg->release_flags & TMFS_RELEASE_FLOCK_UNLOCK) {
 		fi.flock_release = 1;
 		fi.lock_owner = arg->lock_owner;
 	}
@@ -1345,13 +1345,13 @@ static void do_release(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (req->f->op.release)
 		req->f->op.release(req, nodeid, &fi);
 	else
-		fuse_reply_err(req, 0);
+		tmfs_reply_err(req, 0);
 }
 
-static void do_fsync(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_fsync(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_fsync_in *arg = (struct fuse_fsync_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_fsync_in *arg = (struct tmfs_fsync_in *) inarg;
+	struct tmfs_file_info fi;
 
 	memset(&fi, 0, sizeof(fi));
 	fi.fh = arg->fh;
@@ -1360,13 +1360,13 @@ static void do_fsync(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (req->f->op.fsync)
 		req->f->op.fsync(req, nodeid, arg->fsync_flags & 1, &fi);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_opendir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_opendir(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_open_in *arg = (struct fuse_open_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_open_in *arg = (struct tmfs_open_in *) inarg;
+	struct tmfs_file_info fi;
 
 	memset(&fi, 0, sizeof(fi));
 	fi.flags = arg->flags;
@@ -1374,13 +1374,13 @@ static void do_opendir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (req->f->op.opendir)
 		req->f->op.opendir(req, nodeid, &fi);
 	else
-		fuse_reply_open(req, &fi);
+		tmfs_reply_open(req, &fi);
 }
 
-static void do_readdir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_readdir(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_read_in *arg = (struct fuse_read_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_read_in *arg = (struct tmfs_read_in *) inarg;
+	struct tmfs_file_info fi;
 
 	memset(&fi, 0, sizeof(fi));
 	fi.fh = arg->fh;
@@ -1389,13 +1389,13 @@ static void do_readdir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (req->f->op.readdir)
 		req->f->op.readdir(req, nodeid, arg->size, arg->offset, &fi);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_releasedir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_releasedir(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_release_in *arg = (struct fuse_release_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_release_in *arg = (struct tmfs_release_in *) inarg;
+	struct tmfs_file_info fi;
 
 	memset(&fi, 0, sizeof(fi));
 	fi.flags = arg->flags;
@@ -1405,13 +1405,13 @@ static void do_releasedir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (req->f->op.releasedir)
 		req->f->op.releasedir(req, nodeid, &fi);
 	else
-		fuse_reply_err(req, 0);
+		tmfs_reply_err(req, 0);
 }
 
-static void do_fsyncdir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_fsyncdir(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_fsync_in *arg = (struct fuse_fsync_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_fsync_in *arg = (struct tmfs_fsync_in *) inarg;
+	struct tmfs_file_info fi;
 
 	memset(&fi, 0, sizeof(fi));
 	fi.fh = arg->fh;
@@ -1420,10 +1420,10 @@ static void do_fsyncdir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (req->f->op.fsyncdir)
 		req->f->op.fsyncdir(req, nodeid, arg->fsync_flags & 1, &fi);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_statfs(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_statfs(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
 	(void) nodeid;
 	(void) inarg;
@@ -1435,13 +1435,13 @@ static void do_statfs(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 			.f_namemax = 255,
 			.f_bsize = 512,
 		};
-		fuse_reply_statfs(req, &buf);
+		tmfs_reply_statfs(req, &buf);
 	}
 }
 
-static void do_setxattr(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_setxattr(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_setxattr_in *arg = (struct fuse_setxattr_in *) inarg;
+	struct tmfs_setxattr_in *arg = (struct tmfs_setxattr_in *) inarg;
 	char *name = PARAM(arg);
 	char *value = name + strlen(name) + 1;
 
@@ -1449,40 +1449,40 @@ static void do_setxattr(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 		req->f->op.setxattr(req, nodeid, name, value, arg->size,
 				    arg->flags);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_getxattr(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_getxattr(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_getxattr_in *arg = (struct fuse_getxattr_in *) inarg;
+	struct tmfs_getxattr_in *arg = (struct tmfs_getxattr_in *) inarg;
 
 	if (req->f->op.getxattr)
 		req->f->op.getxattr(req, nodeid, PARAM(arg), arg->size);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_listxattr(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_listxattr(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_getxattr_in *arg = (struct fuse_getxattr_in *) inarg;
+	struct tmfs_getxattr_in *arg = (struct tmfs_getxattr_in *) inarg;
 
 	if (req->f->op.listxattr)
 		req->f->op.listxattr(req, nodeid, arg->size);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_removexattr(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_removexattr(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
 	char *name = (char *) inarg;
 
 	if (req->f->op.removexattr)
 		req->f->op.removexattr(req, nodeid, name);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void convert_fuse_file_lock(struct fuse_file_lock *fl,
+static void convert_tmfs_file_lock(struct tmfs_file_lock *fl,
 				   struct flock *flock)
 {
 	memset(flock, 0, sizeof(struct flock));
@@ -1496,35 +1496,35 @@ static void convert_fuse_file_lock(struct fuse_file_lock *fl,
 	flock->l_pid = fl->pid;
 }
 
-static void do_getlk(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_getlk(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_lk_in *arg = (struct fuse_lk_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_lk_in *arg = (struct tmfs_lk_in *) inarg;
+	struct tmfs_file_info fi;
 	struct flock flock;
 
 	memset(&fi, 0, sizeof(fi));
 	fi.fh = arg->fh;
 	fi.lock_owner = arg->owner;
 
-	convert_fuse_file_lock(&arg->lk, &flock);
+	convert_tmfs_file_lock(&arg->lk, &flock);
 	if (req->f->op.getlk)
 		req->f->op.getlk(req, nodeid, &fi, &flock);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_setlk_common(fuse_req_t req, fuse_ino_t nodeid,
+static void do_setlk_common(tmfs_req_t req, tmfs_ino_t nodeid,
 			    const void *inarg, int sleep)
 {
-	struct fuse_lk_in *arg = (struct fuse_lk_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_lk_in *arg = (struct tmfs_lk_in *) inarg;
+	struct tmfs_file_info fi;
 	struct flock flock;
 
 	memset(&fi, 0, sizeof(fi));
 	fi.fh = arg->fh;
 	fi.lock_owner = arg->owner;
 
-	if (arg->lk_flags & FUSE_LK_FLOCK) {
+	if (arg->lk_flags & TMFS_LK_FLOCK) {
 		int op = 0;
 
 		switch (arg->lk.type) {
@@ -1544,33 +1544,33 @@ static void do_setlk_common(fuse_req_t req, fuse_ino_t nodeid,
 		if (req->f->op.flock)
 			req->f->op.flock(req, nodeid, &fi, op);
 		else
-			fuse_reply_err(req, ENOSYS);
+			tmfs_reply_err(req, ENOSYS);
 	} else {
-		convert_fuse_file_lock(&arg->lk, &flock);
+		convert_tmfs_file_lock(&arg->lk, &flock);
 		if (req->f->op.setlk)
 			req->f->op.setlk(req, nodeid, &fi, &flock, sleep);
 		else
-			fuse_reply_err(req, ENOSYS);
+			tmfs_reply_err(req, ENOSYS);
 	}
 }
 
-static void do_setlk(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_setlk(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
 	do_setlk_common(req, nodeid, inarg, 0);
 }
 
-static void do_setlkw(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_setlkw(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
 	do_setlk_common(req, nodeid, inarg, 1);
 }
 
-static int find_interrupted(struct fuse_ll *f, struct fuse_req *req)
+static int find_interrupted(struct tmfs_ll *f, struct tmfs_req *req)
 {
-	struct fuse_req *curr;
+	struct tmfs_req *curr;
 
 	for (curr = f->list.next; curr != &f->list; curr = curr->next) {
 		if (curr->unique == req->u.i.unique) {
-			fuse_interrupt_func_t func;
+			tmfs_interrupt_func_t func;
 			void *data;
 
 			curr->ctr++;
@@ -1603,10 +1603,10 @@ static int find_interrupted(struct fuse_ll *f, struct fuse_req *req)
 	return 0;
 }
 
-static void do_interrupt(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_interrupt(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_interrupt_in *arg = (struct fuse_interrupt_in *) inarg;
-	struct fuse_ll *f = req->f;
+	struct tmfs_interrupt_in *arg = (struct tmfs_interrupt_in *) inarg;
+	struct tmfs_ll *f = req->f;
 
 	(void) nodeid;
 	if (f->debug)
@@ -1623,9 +1623,9 @@ static void do_interrupt(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	pthread_mutex_unlock(&f->lock);
 }
 
-static struct fuse_req *check_interrupt(struct fuse_ll *f, struct fuse_req *req)
+static struct tmfs_req *check_interrupt(struct tmfs_ll *f, struct tmfs_req *req)
 {
-	struct fuse_req *curr;
+	struct tmfs_req *curr;
 
 	for (curr = f->interrupts.next; curr != &f->interrupts;
 	     curr = curr->next) {
@@ -1645,26 +1645,26 @@ static struct fuse_req *check_interrupt(struct fuse_ll *f, struct fuse_req *req)
 		return NULL;
 }
 
-static void do_bmap(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_bmap(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_bmap_in *arg = (struct fuse_bmap_in *) inarg;
+	struct tmfs_bmap_in *arg = (struct tmfs_bmap_in *) inarg;
 
 	if (req->f->op.bmap)
 		req->f->op.bmap(req, nodeid, arg->blocksize, arg->block);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_ioctl(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_ioctl(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_ioctl_in *arg = (struct fuse_ioctl_in *) inarg;
+	struct tmfs_ioctl_in *arg = (struct tmfs_ioctl_in *) inarg;
 	unsigned int flags = arg->flags;
 	void *in_buf = arg->in_size ? PARAM(arg) : NULL;
-	struct fuse_file_info fi;
+	struct tmfs_file_info fi;
 
-	if (flags & FUSE_IOCTL_DIR &&
-	    !(req->f->conn.want & FUSE_CAP_IOCTL_DIR)) {
-		fuse_reply_err(req, ENOTTY);
+	if (flags & TMFS_IOCTL_DIR &&
+	    !(req->f->conn.want & TMFS_CAP_IOCTL_DIR)) {
+		tmfs_reply_err(req, ENOTTY);
 		return;
 	}
 
@@ -1673,7 +1673,7 @@ static void do_ioctl(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	fi.fh_old = fi.fh;
 
 	if (sizeof(void *) == 4 && req->f->conn.proto_minor >= 16 &&
-	    !(flags & FUSE_IOCTL_32BIT)) {
+	    !(flags & TMFS_IOCTL_32BIT)) {
 		req->ioctl_64bit = 1;
 	}
 
@@ -1682,30 +1682,30 @@ static void do_ioctl(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 				 (void *)(uintptr_t)arg->arg, &fi, flags,
 				 in_buf, arg->in_size, arg->out_size);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-void fuse_pollhandle_destroy(struct fuse_pollhandle *ph)
+void tmfs_pollhandle_destroy(struct tmfs_pollhandle *ph)
 {
 	free(ph);
 }
 
-static void do_poll(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_poll(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_poll_in *arg = (struct fuse_poll_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_poll_in *arg = (struct tmfs_poll_in *) inarg;
+	struct tmfs_file_info fi;
 
 	memset(&fi, 0, sizeof(fi));
 	fi.fh = arg->fh;
 	fi.fh_old = fi.fh;
 
 	if (req->f->op.poll) {
-		struct fuse_pollhandle *ph = NULL;
+		struct tmfs_pollhandle *ph = NULL;
 
-		if (arg->flags & FUSE_POLL_SCHEDULE_NOTIFY) {
-			ph = malloc(sizeof(struct fuse_pollhandle));
+		if (arg->flags & TMFS_POLL_SCHEDULE_NOTIFY) {
+			ph = malloc(sizeof(struct tmfs_pollhandle));
 			if (ph == NULL) {
-				fuse_reply_err(req, ENOMEM);
+				tmfs_reply_err(req, ENOMEM);
 				return;
 			}
 			ph->kh = arg->kh;
@@ -1715,14 +1715,14 @@ static void do_poll(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 
 		req->f->op.poll(req, nodeid, &fi, ph);
 	} else {
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 	}
 }
 
-static void do_fallocate(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_fallocate(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_fallocate_in *arg = (struct fuse_fallocate_in *) inarg;
-	struct fuse_file_info fi;
+	struct tmfs_fallocate_in *arg = (struct tmfs_fallocate_in *) inarg;
+	struct tmfs_file_info fi;
 
 	memset(&fi, 0, sizeof(fi));
 	fi.fh = arg->fh;
@@ -1730,15 +1730,15 @@ static void do_fallocate(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (req->f->op.fallocate)
 		req->f->op.fallocate(req, nodeid, arg->mode, arg->offset, arg->length, &fi);
 	else
-		fuse_reply_err(req, ENOSYS);
+		tmfs_reply_err(req, ENOSYS);
 }
 
-static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_init(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_init_in *arg = (struct fuse_init_in *) inarg;
-	struct fuse_init_out outarg;
-	struct fuse_ll *f = req->f;
-	size_t bufsize = fuse_chan_bufsize(req->ch);
+	struct tmfs_init_in *arg = (struct tmfs_init_in *) inarg;
+	struct tmfs_init_out outarg;
+	struct tmfs_ll *f = req->f;
+	size_t bufsize = tmfs_chan_bufsize(req->ch);
 
 	(void) nodeid;
 	if (f->debug) {
@@ -1755,13 +1755,13 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	f->conn.want = 0;
 
 	memset(&outarg, 0, sizeof(outarg));
-	outarg.major = FUSE_KERNEL_VERSION;
-	outarg.minor = FUSE_KERNEL_MINOR_VERSION;
+	outarg.major = TMFS_KERNEL_VERSION;
+	outarg.minor = TMFS_KERNEL_MINOR_VERSION;
 
 	if (arg->major < 7) {
-		fprintf(stderr, "fuse: unsupported protocol version: %u.%u\n",
+		fprintf(stderr, "tmfs: unsupported protocol version: %u.%u\n",
 			arg->major, arg->minor);
-		fuse_reply_err(req, EPROTO);
+		tmfs_reply_err(req, EPROTO);
 		return;
 	}
 
@@ -1773,23 +1773,23 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 
 	if (arg->minor >= 6) {
 		if (f->conn.async_read)
-			f->conn.async_read = arg->flags & FUSE_ASYNC_READ;
+			f->conn.async_read = arg->flags & TMFS_ASYNC_READ;
 		if (arg->max_readahead < f->conn.max_readahead)
 			f->conn.max_readahead = arg->max_readahead;
-		if (arg->flags & FUSE_ASYNC_READ)
-			f->conn.capable |= FUSE_CAP_ASYNC_READ;
-		if (arg->flags & FUSE_POSIX_LOCKS)
-			f->conn.capable |= FUSE_CAP_POSIX_LOCKS;
-		if (arg->flags & FUSE_ATOMIC_O_TRUNC)
-			f->conn.capable |= FUSE_CAP_ATOMIC_O_TRUNC;
-		if (arg->flags & FUSE_EXPORT_SUPPORT)
-			f->conn.capable |= FUSE_CAP_EXPORT_SUPPORT;
-		if (arg->flags & FUSE_BIG_WRITES)
-			f->conn.capable |= FUSE_CAP_BIG_WRITES;
-		if (arg->flags & FUSE_DONT_MASK)
-			f->conn.capable |= FUSE_CAP_DONT_MASK;
-		if (arg->flags & FUSE_FLOCK_LOCKS)
-			f->conn.capable |= FUSE_CAP_FLOCK_LOCKS;
+		if (arg->flags & TMFS_ASYNC_READ)
+			f->conn.capable |= TMFS_CAP_ASYNC_READ;
+		if (arg->flags & TMFS_POSIX_LOCKS)
+			f->conn.capable |= TMFS_CAP_POSIX_LOCKS;
+		if (arg->flags & TMFS_ATOMIC_O_TRUNC)
+			f->conn.capable |= TMFS_CAP_ATOMIC_O_TRUNC;
+		if (arg->flags & TMFS_EXPORT_SUPPORT)
+			f->conn.capable |= TMFS_CAP_EXPORT_SUPPORT;
+		if (arg->flags & TMFS_BIG_WRITES)
+			f->conn.capable |= TMFS_CAP_BIG_WRITES;
+		if (arg->flags & TMFS_DONT_MASK)
+			f->conn.capable |= TMFS_CAP_DONT_MASK;
+		if (arg->flags & TMFS_FLOCK_LOCKS)
+			f->conn.capable |= TMFS_CAP_FLOCK_LOCKS;
 	} else {
 		f->conn.async_read = 0;
 		f->conn.max_readahead = 0;
@@ -1798,33 +1798,33 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (req->f->conn.proto_minor >= 14) {
 #ifdef HAVE_SPLICE
 #ifdef HAVE_VMSPLICE
-		f->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
+		f->conn.capable |= TMFS_CAP_SPLICE_WRITE | TMFS_CAP_SPLICE_MOVE;
 		if (f->splice_write)
-			f->conn.want |= FUSE_CAP_SPLICE_WRITE;
+			f->conn.want |= TMFS_CAP_SPLICE_WRITE;
 		if (f->splice_move)
-			f->conn.want |= FUSE_CAP_SPLICE_MOVE;
+			f->conn.want |= TMFS_CAP_SPLICE_MOVE;
 #endif
-		f->conn.capable |= FUSE_CAP_SPLICE_READ;
+		f->conn.capable |= TMFS_CAP_SPLICE_READ;
 		if (f->splice_read)
-			f->conn.want |= FUSE_CAP_SPLICE_READ;
+			f->conn.want |= TMFS_CAP_SPLICE_READ;
 #endif
 	}
 	if (req->f->conn.proto_minor >= 18)
-		f->conn.capable |= FUSE_CAP_IOCTL_DIR;
+		f->conn.capable |= TMFS_CAP_IOCTL_DIR;
 
 	if (f->atomic_o_trunc)
-		f->conn.want |= FUSE_CAP_ATOMIC_O_TRUNC;
+		f->conn.want |= TMFS_CAP_ATOMIC_O_TRUNC;
 	if (f->op.getlk && f->op.setlk && !f->no_remote_posix_lock)
-		f->conn.want |= FUSE_CAP_POSIX_LOCKS;
+		f->conn.want |= TMFS_CAP_POSIX_LOCKS;
 	if (f->op.flock && !f->no_remote_flock)
-		f->conn.want |= FUSE_CAP_FLOCK_LOCKS;
+		f->conn.want |= TMFS_CAP_FLOCK_LOCKS;
 	if (f->big_writes)
-		f->conn.want |= FUSE_CAP_BIG_WRITES;
+		f->conn.want |= TMFS_CAP_BIG_WRITES;
 
-	if (bufsize < FUSE_MIN_READ_BUFFER) {
-		fprintf(stderr, "fuse: warning: buffer size too small: %zu\n",
+	if (bufsize < TMFS_MIN_READ_BUFFER) {
+		fprintf(stderr, "tmfs: warning: buffer size too small: %zu\n",
 			bufsize);
-		bufsize = FUSE_MIN_READ_BUFFER;
+		bufsize = TMFS_MIN_READ_BUFFER;
 	}
 
 	bufsize -= 4096;
@@ -1836,26 +1836,26 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 		f->op.init(f->userdata, &f->conn);
 
 	if (f->no_splice_read)
-		f->conn.want &= ~FUSE_CAP_SPLICE_READ;
+		f->conn.want &= ~TMFS_CAP_SPLICE_READ;
 	if (f->no_splice_write)
-		f->conn.want &= ~FUSE_CAP_SPLICE_WRITE;
+		f->conn.want &= ~TMFS_CAP_SPLICE_WRITE;
 	if (f->no_splice_move)
-		f->conn.want &= ~FUSE_CAP_SPLICE_MOVE;
+		f->conn.want &= ~TMFS_CAP_SPLICE_MOVE;
 
-	if (f->conn.async_read || (f->conn.want & FUSE_CAP_ASYNC_READ))
-		outarg.flags |= FUSE_ASYNC_READ;
-	if (f->conn.want & FUSE_CAP_POSIX_LOCKS)
-		outarg.flags |= FUSE_POSIX_LOCKS;
-	if (f->conn.want & FUSE_CAP_ATOMIC_O_TRUNC)
-		outarg.flags |= FUSE_ATOMIC_O_TRUNC;
-	if (f->conn.want & FUSE_CAP_EXPORT_SUPPORT)
-		outarg.flags |= FUSE_EXPORT_SUPPORT;
-	if (f->conn.want & FUSE_CAP_BIG_WRITES)
-		outarg.flags |= FUSE_BIG_WRITES;
-	if (f->conn.want & FUSE_CAP_DONT_MASK)
-		outarg.flags |= FUSE_DONT_MASK;
-	if (f->conn.want & FUSE_CAP_FLOCK_LOCKS)
-		outarg.flags |= FUSE_FLOCK_LOCKS;
+	if (f->conn.async_read || (f->conn.want & TMFS_CAP_ASYNC_READ))
+		outarg.flags |= TMFS_ASYNC_READ;
+	if (f->conn.want & TMFS_CAP_POSIX_LOCKS)
+		outarg.flags |= TMFS_POSIX_LOCKS;
+	if (f->conn.want & TMFS_CAP_ATOMIC_O_TRUNC)
+		outarg.flags |= TMFS_ATOMIC_O_TRUNC;
+	if (f->conn.want & TMFS_CAP_EXPORT_SUPPORT)
+		outarg.flags |= TMFS_EXPORT_SUPPORT;
+	if (f->conn.want & TMFS_CAP_BIG_WRITES)
+		outarg.flags |= TMFS_BIG_WRITES;
+	if (f->conn.want & TMFS_CAP_DONT_MASK)
+		outarg.flags |= TMFS_DONT_MASK;
+	if (f->conn.want & TMFS_CAP_FLOCK_LOCKS)
+		outarg.flags |= TMFS_FLOCK_LOCKS;
 	outarg.max_readahead = f->conn.max_readahead;
 	outarg.max_write = f->conn.max_write;
 	if (f->conn.proto_minor >= 13) {
@@ -1887,9 +1887,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	send_reply_ok(req, &outarg, arg->minor < 5 ? 8 : sizeof(outarg));
 }
 
-static void do_destroy(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
+static void do_destroy(tmfs_req_t req, tmfs_ino_t nodeid, const void *inarg)
 {
-	struct fuse_ll *f = req->f;
+	struct tmfs_ll *f = req->f;
 
 	(void) nodeid;
 	(void) inarg;
@@ -1901,36 +1901,36 @@ static void do_destroy(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	send_reply_ok(req, NULL, 0);
 }
 
-static void list_del_nreq(struct fuse_notify_req *nreq)
+static void list_del_nreq(struct tmfs_notify_req *nreq)
 {
-	struct fuse_notify_req *prev = nreq->prev;
-	struct fuse_notify_req *next = nreq->next;
+	struct tmfs_notify_req *prev = nreq->prev;
+	struct tmfs_notify_req *next = nreq->next;
 	prev->next = next;
 	next->prev = prev;
 }
 
-static void list_add_nreq(struct fuse_notify_req *nreq,
-			  struct fuse_notify_req *next)
+static void list_add_nreq(struct tmfs_notify_req *nreq,
+			  struct tmfs_notify_req *next)
 {
-	struct fuse_notify_req *prev = next->prev;
+	struct tmfs_notify_req *prev = next->prev;
 	nreq->next = next;
 	nreq->prev = prev;
 	prev->next = nreq;
 	next->prev = nreq;
 }
 
-static void list_init_nreq(struct fuse_notify_req *nreq)
+static void list_init_nreq(struct tmfs_notify_req *nreq)
 {
 	nreq->next = nreq;
 	nreq->prev = nreq;
 }
 
-static void do_notify_reply(fuse_req_t req, fuse_ino_t nodeid,
-			    const void *inarg, const struct fuse_buf *buf)
+static void do_notify_reply(tmfs_req_t req, tmfs_ino_t nodeid,
+			    const void *inarg, const struct tmfs_buf *buf)
 {
-	struct fuse_ll *f = req->f;
-	struct fuse_notify_req *nreq;
-	struct fuse_notify_req *head;
+	struct tmfs_ll *f = req->f;
+	struct tmfs_notify_req *nreq;
+	struct tmfs_notify_req *head;
 
 	pthread_mutex_lock(&f->lock);
 	head = &f->notify_list;
@@ -1946,10 +1946,10 @@ static void do_notify_reply(fuse_req_t req, fuse_ino_t nodeid,
 		nreq->reply(nreq, req, nodeid, inarg, buf);
 }
 
-static int send_notify_iov(struct fuse_ll *f, struct fuse_chan *ch,
+static int send_notify_iov(struct tmfs_ll *f, struct tmfs_chan *ch,
 			   int notify_code, struct iovec *iov, int count)
 {
-	struct fuse_out_header out;
+	struct tmfs_out_header out;
 
 	if (!f->got_init)
 		return -ENOTCONN;
@@ -1957,15 +1957,15 @@ static int send_notify_iov(struct fuse_ll *f, struct fuse_chan *ch,
 	out.unique = 0;
 	out.error = notify_code;
 	iov[0].iov_base = &out;
-	iov[0].iov_len = sizeof(struct fuse_out_header);
+	iov[0].iov_len = sizeof(struct tmfs_out_header);
 
-	return fuse_send_msg(f, ch, iov, count);
+	return tmfs_send_msg(f, ch, iov, count);
 }
 
-int fuse_lowlevel_notify_poll(struct fuse_pollhandle *ph)
+int tmfs_lowlevel_notify_poll(struct tmfs_pollhandle *ph)
 {
 	if (ph != NULL) {
-		struct fuse_notify_poll_wakeup_out outarg;
+		struct tmfs_notify_poll_wakeup_out outarg;
 		struct iovec iov[2];
 
 		outarg.kh = ph->kh;
@@ -1973,23 +1973,23 @@ int fuse_lowlevel_notify_poll(struct fuse_pollhandle *ph)
 		iov[1].iov_base = &outarg;
 		iov[1].iov_len = sizeof(outarg);
 
-		return send_notify_iov(ph->f, ph->ch, FUSE_NOTIFY_POLL, iov, 2);
+		return send_notify_iov(ph->f, ph->ch, TMFS_NOTIFY_POLL, iov, 2);
 	} else {
 		return 0;
 	}
 }
 
-int fuse_lowlevel_notify_inval_inode(struct fuse_chan *ch, fuse_ino_t ino,
+int tmfs_lowlevel_notify_inval_inode(struct tmfs_chan *ch, tmfs_ino_t ino,
                                      off_t off, off_t len)
 {
-	struct fuse_notify_inval_inode_out outarg;
-	struct fuse_ll *f;
+	struct tmfs_notify_inval_inode_out outarg;
+	struct tmfs_ll *f;
 	struct iovec iov[2];
 
 	if (!ch)
 		return -EINVAL;
 
-	f = (struct fuse_ll *)fuse_session_data(fuse_chan_session(ch));
+	f = (struct tmfs_ll *)tmfs_session_data(tmfs_chan_session(ch));
 	if (!f)
 		return -ENODEV;
 
@@ -2000,20 +2000,20 @@ int fuse_lowlevel_notify_inval_inode(struct fuse_chan *ch, fuse_ino_t ino,
 	iov[1].iov_base = &outarg;
 	iov[1].iov_len = sizeof(outarg);
 
-	return send_notify_iov(f, ch, FUSE_NOTIFY_INVAL_INODE, iov, 2);
+	return send_notify_iov(f, ch, TMFS_NOTIFY_INVAL_INODE, iov, 2);
 }
 
-int fuse_lowlevel_notify_inval_entry(struct fuse_chan *ch, fuse_ino_t parent,
+int tmfs_lowlevel_notify_inval_entry(struct tmfs_chan *ch, tmfs_ino_t parent,
                                      const char *name, size_t namelen)
 {
-	struct fuse_notify_inval_entry_out outarg;
-	struct fuse_ll *f;
+	struct tmfs_notify_inval_entry_out outarg;
+	struct tmfs_ll *f;
 	struct iovec iov[3];
 
 	if (!ch)
 		return -EINVAL;
 
-	f = (struct fuse_ll *)fuse_session_data(fuse_chan_session(ch));
+	f = (struct tmfs_ll *)tmfs_session_data(tmfs_chan_session(ch));
 	if (!f)
 		return -ENODEV;
 
@@ -2026,21 +2026,21 @@ int fuse_lowlevel_notify_inval_entry(struct fuse_chan *ch, fuse_ino_t parent,
 	iov[2].iov_base = (void *)name;
 	iov[2].iov_len = namelen + 1;
 
-	return send_notify_iov(f, ch, FUSE_NOTIFY_INVAL_ENTRY, iov, 3);
+	return send_notify_iov(f, ch, TMFS_NOTIFY_INVAL_ENTRY, iov, 3);
 }
 
-int fuse_lowlevel_notify_delete(struct fuse_chan *ch,
-				fuse_ino_t parent, fuse_ino_t child,
+int tmfs_lowlevel_notify_delete(struct tmfs_chan *ch,
+				tmfs_ino_t parent, tmfs_ino_t child,
 				const char *name, size_t namelen)
 {
-	struct fuse_notify_delete_out outarg;
-	struct fuse_ll *f;
+	struct tmfs_notify_delete_out outarg;
+	struct tmfs_ll *f;
 	struct iovec iov[3];
 
 	if (!ch)
 		return -EINVAL;
 
-	f = (struct fuse_ll *)fuse_session_data(fuse_chan_session(ch));
+	f = (struct tmfs_ll *)tmfs_session_data(tmfs_chan_session(ch));
 	if (!f)
 		return -ENODEV;
 
@@ -2057,24 +2057,24 @@ int fuse_lowlevel_notify_delete(struct fuse_chan *ch,
 	iov[2].iov_base = (void *)name;
 	iov[2].iov_len = namelen + 1;
 
-	return send_notify_iov(f, ch, FUSE_NOTIFY_DELETE, iov, 3);
+	return send_notify_iov(f, ch, TMFS_NOTIFY_DELETE, iov, 3);
 }
 
-int fuse_lowlevel_notify_store(struct fuse_chan *ch, fuse_ino_t ino,
-			       off_t offset, struct fuse_bufvec *bufv,
-			       enum fuse_buf_copy_flags flags)
+int tmfs_lowlevel_notify_store(struct tmfs_chan *ch, tmfs_ino_t ino,
+			       off_t offset, struct tmfs_bufvec *bufv,
+			       enum tmfs_buf_copy_flags flags)
 {
-	struct fuse_out_header out;
-	struct fuse_notify_store_out outarg;
-	struct fuse_ll *f;
+	struct tmfs_out_header out;
+	struct tmfs_notify_store_out outarg;
+	struct tmfs_ll *f;
 	struct iovec iov[3];
-	size_t size = fuse_buf_size(bufv);
+	size_t size = tmfs_buf_size(bufv);
 	int res;
 
 	if (!ch)
 		return -EINVAL;
 
-	f = (struct fuse_ll *)fuse_session_data(fuse_chan_session(ch));
+	f = (struct tmfs_ll *)tmfs_session_data(tmfs_chan_session(ch));
 	if (!f)
 		return -ENODEV;
 
@@ -2082,7 +2082,7 @@ int fuse_lowlevel_notify_store(struct fuse_chan *ch, fuse_ino_t ino,
 		return -ENOSYS;
 
 	out.unique = 0;
-	out.error = FUSE_NOTIFY_STORE;
+	out.error = TMFS_NOTIFY_STORE;
 
 	outarg.nodeid = ino;
 	outarg.offset = offset;
@@ -2093,41 +2093,41 @@ int fuse_lowlevel_notify_store(struct fuse_chan *ch, fuse_ino_t ino,
 	iov[1].iov_base = &outarg;
 	iov[1].iov_len = sizeof(outarg);
 
-	res = fuse_send_data_iov(f, ch, iov, 2, bufv, flags);
+	res = tmfs_send_data_iov(f, ch, iov, 2, bufv, flags);
 	if (res > 0)
 		res = -res;
 
 	return res;
 }
 
-struct fuse_retrieve_req {
-	struct fuse_notify_req nreq;
+struct tmfs_retrieve_req {
+	struct tmfs_notify_req nreq;
 	void *cookie;
 };
 
-static void fuse_ll_retrieve_reply(struct fuse_notify_req *nreq,
-				   fuse_req_t req, fuse_ino_t ino,
+static void tmfs_ll_retrieve_reply(struct tmfs_notify_req *nreq,
+				   tmfs_req_t req, tmfs_ino_t ino,
 				   const void *inarg,
-				   const struct fuse_buf *ibuf)
+				   const struct tmfs_buf *ibuf)
 {
-	struct fuse_ll *f = req->f;
-	struct fuse_retrieve_req *rreq =
-		container_of(nreq, struct fuse_retrieve_req, nreq);
-	const struct fuse_notify_retrieve_in *arg = inarg;
-	struct fuse_bufvec bufv = {
+	struct tmfs_ll *f = req->f;
+	struct tmfs_retrieve_req *rreq =
+		container_of(nreq, struct tmfs_retrieve_req, nreq);
+	const struct tmfs_notify_retrieve_in *arg = inarg;
+	struct tmfs_bufvec bufv = {
 		.buf[0] = *ibuf,
 		.count = 1,
 	};
 
-	if (!(bufv.buf[0].flags & FUSE_BUF_IS_FD))
+	if (!(bufv.buf[0].flags & TMFS_BUF_IS_FD))
 		bufv.buf[0].mem = PARAM(arg);
 
-	bufv.buf[0].size -= sizeof(struct fuse_in_header) +
-		sizeof(struct fuse_notify_retrieve_in);
+	bufv.buf[0].size -= sizeof(struct tmfs_in_header) +
+		sizeof(struct tmfs_notify_retrieve_in);
 
 	if (bufv.buf[0].size < arg->size) {
-		fprintf(stderr, "fuse: retrieve reply: buffer size too small\n");
-		fuse_reply_none(req);
+		fprintf(stderr, "tmfs: retrieve reply: buffer size too small\n");
+		tmfs_reply_none(req);
 		goto out;
 	}
 	bufv.buf[0].size = arg->size;
@@ -2136,27 +2136,27 @@ static void fuse_ll_retrieve_reply(struct fuse_notify_req *nreq,
 		req->f->op.retrieve_reply(req, rreq->cookie, ino,
 					  arg->offset, &bufv);
 	} else {
-		fuse_reply_none(req);
+		tmfs_reply_none(req);
 	}
 out:
 	free(rreq);
-	if ((ibuf->flags & FUSE_BUF_IS_FD) && bufv.idx < bufv.count)
-		fuse_ll_clear_pipe(f);
+	if ((ibuf->flags & TMFS_BUF_IS_FD) && bufv.idx < bufv.count)
+		tmfs_ll_clear_pipe(f);
 }
 
-int fuse_lowlevel_notify_retrieve(struct fuse_chan *ch, fuse_ino_t ino,
+int tmfs_lowlevel_notify_retrieve(struct tmfs_chan *ch, tmfs_ino_t ino,
 				  size_t size, off_t offset, void *cookie)
 {
-	struct fuse_notify_retrieve_out outarg;
-	struct fuse_ll *f;
+	struct tmfs_notify_retrieve_out outarg;
+	struct tmfs_ll *f;
 	struct iovec iov[2];
-	struct fuse_retrieve_req *rreq;
+	struct tmfs_retrieve_req *rreq;
 	int err;
 
 	if (!ch)
 		return -EINVAL;
 
-	f = (struct fuse_ll *)fuse_session_data(fuse_chan_session(ch));
+	f = (struct tmfs_ll *)tmfs_session_data(tmfs_chan_session(ch));
 	if (!f)
 		return -ENODEV;
 
@@ -2170,7 +2170,7 @@ int fuse_lowlevel_notify_retrieve(struct fuse_chan *ch, fuse_ino_t ino,
 	pthread_mutex_lock(&f->lock);
 	rreq->cookie = cookie;
 	rreq->nreq.unique = f->notify_ctr++;
-	rreq->nreq.reply = fuse_ll_retrieve_reply;
+	rreq->nreq.reply = tmfs_ll_retrieve_reply;
 	list_add_nreq(&rreq->nreq, &f->notify_list);
 	pthread_mutex_unlock(&f->lock);
 
@@ -2182,7 +2182,7 @@ int fuse_lowlevel_notify_retrieve(struct fuse_chan *ch, fuse_ino_t ino,
 	iov[1].iov_base = &outarg;
 	iov[1].iov_len = sizeof(outarg);
 
-	err = send_notify_iov(f, ch, FUSE_NOTIFY_RETRIEVE, iov, 2);
+	err = send_notify_iov(f, ch, TMFS_NOTIFY_RETRIEVE, iov, 2);
 	if (err) {
 		pthread_mutex_lock(&f->lock);
 		list_del_nreq(&rreq->nreq);
@@ -2193,32 +2193,32 @@ int fuse_lowlevel_notify_retrieve(struct fuse_chan *ch, fuse_ino_t ino,
 	return err;
 }
 
-void *fuse_req_userdata(fuse_req_t req)
+void *tmfs_req_userdata(tmfs_req_t req)
 {
 	return req->f->userdata;
 }
 
-const struct fuse_ctx *fuse_req_ctx(fuse_req_t req)
+const struct tmfs_ctx *tmfs_req_ctx(tmfs_req_t req)
 {
 	return &req->ctx;
 }
 
 /*
- * The size of fuse_ctx got extended, so need to be careful about
+ * The size of tmfs_ctx got extended, so need to be careful about
  * incompatibility (i.e. a new binary cannot work with an old
  * library).
  */
-const struct fuse_ctx *fuse_req_ctx_compat24(fuse_req_t req);
-const struct fuse_ctx *fuse_req_ctx_compat24(fuse_req_t req)
+const struct tmfs_ctx *tmfs_req_ctx_compat24(tmfs_req_t req);
+const struct tmfs_ctx *tmfs_req_ctx_compat24(tmfs_req_t req)
 {
-	return fuse_req_ctx(req);
+	return tmfs_req_ctx(req);
 }
 #ifndef __NetBSD__
-FUSE_SYMVER(".symver fuse_req_ctx_compat24,fuse_req_ctx@FUSE_2.4");
+TMFS_SYMVER(".symver tmfs_req_ctx_compat24,tmfs_req_ctx@TMFS_2.4");
 #endif
 
 
-void fuse_req_interrupt_func(fuse_req_t req, fuse_interrupt_func_t func,
+void tmfs_req_interrupt_func(tmfs_req_t req, tmfs_interrupt_func_t func,
 			     void *data)
 {
 	pthread_mutex_lock(&req->lock);
@@ -2231,7 +2231,7 @@ void fuse_req_interrupt_func(fuse_req_t req, fuse_interrupt_func_t func,
 	pthread_mutex_unlock(&req->lock);
 }
 
-int fuse_req_interrupted(fuse_req_t req)
+int tmfs_req_interrupted(tmfs_req_t req)
 {
 	int interrupted;
 
@@ -2243,105 +2243,105 @@ int fuse_req_interrupted(fuse_req_t req)
 }
 
 static struct {
-	void (*func)(fuse_req_t, fuse_ino_t, const void *);
+	void (*func)(tmfs_req_t, tmfs_ino_t, const void *);
 	const char *name;
-} fuse_ll_ops[] = {
-	[FUSE_LOOKUP]	   = { do_lookup,      "LOOKUP"	     },
-	[FUSE_FORGET]	   = { do_forget,      "FORGET"	     },
-	[FUSE_GETATTR]	   = { do_getattr,     "GETATTR"     },
-	[FUSE_SETATTR]	   = { do_setattr,     "SETATTR"     },
-	[FUSE_READLINK]	   = { do_readlink,    "READLINK"    },
-	[FUSE_SYMLINK]	   = { do_symlink,     "SYMLINK"     },
-	[FUSE_MKNOD]	   = { do_mknod,       "MKNOD"	     },
-	[FUSE_MKDIR]	   = { do_mkdir,       "MKDIR"	     },
-	[FUSE_UNLINK]	   = { do_unlink,      "UNLINK"	     },
-	[FUSE_RMDIR]	   = { do_rmdir,       "RMDIR"	     },
-	[FUSE_RENAME]	   = { do_rename,      "RENAME"	     },
-	[FUSE_LINK]	   = { do_link,	       "LINK"	     },
-	[FUSE_OPEN]	   = { do_open,	       "OPEN"	     },
-	[FUSE_READ]	   = { do_read,	       "READ"	     },
-	[FUSE_WRITE]	   = { do_write,       "WRITE"	     },
-	[FUSE_STATFS]	   = { do_statfs,      "STATFS"	     },
-	[FUSE_RELEASE]	   = { do_release,     "RELEASE"     },
-	[FUSE_FSYNC]	   = { do_fsync,       "FSYNC"	     },
-	[FUSE_SETXATTR]	   = { do_setxattr,    "SETXATTR"    },
-	[FUSE_GETXATTR]	   = { do_getxattr,    "GETXATTR"    },
-	[FUSE_LISTXATTR]   = { do_listxattr,   "LISTXATTR"   },
-	[FUSE_REMOVEXATTR] = { do_removexattr, "REMOVEXATTR" },
-	[FUSE_FLUSH]	   = { do_flush,       "FLUSH"	     },
-	[FUSE_INIT]	   = { do_init,	       "INIT"	     },
-	[FUSE_OPENDIR]	   = { do_opendir,     "OPENDIR"     },
-	[FUSE_READDIR]	   = { do_readdir,     "READDIR"     },
-	[FUSE_RELEASEDIR]  = { do_releasedir,  "RELEASEDIR"  },
-	[FUSE_FSYNCDIR]	   = { do_fsyncdir,    "FSYNCDIR"    },
-	[FUSE_GETLK]	   = { do_getlk,       "GETLK"	     },
-	[FUSE_SETLK]	   = { do_setlk,       "SETLK"	     },
-	[FUSE_SETLKW]	   = { do_setlkw,      "SETLKW"	     },
-	[FUSE_ACCESS]	   = { do_access,      "ACCESS"	     },
-	[FUSE_CREATE]	   = { do_create,      "CREATE"	     },
-	[FUSE_INTERRUPT]   = { do_interrupt,   "INTERRUPT"   },
-	[FUSE_BMAP]	   = { do_bmap,	       "BMAP"	     },
-	[FUSE_IOCTL]	   = { do_ioctl,       "IOCTL"	     },
-	[FUSE_POLL]	   = { do_poll,        "POLL"	     },
-	[FUSE_FALLOCATE]   = { do_fallocate,   "FALLOCATE"   },
-	[FUSE_DESTROY]	   = { do_destroy,     "DESTROY"     },
-	[FUSE_NOTIFY_REPLY] = { (void *) 1,    "NOTIFY_REPLY" },
-	[FUSE_BATCH_FORGET] = { do_batch_forget, "BATCH_FORGET" },
-	[CUSE_INIT]	   = { cuse_lowlevel_init, "CUSE_INIT"   },
+} tmfs_ll_ops[] = {
+	[TMFS_LOOKUP]	   = { do_lookup,      "LOOKUP"	     },
+	[TMFS_FORGET]	   = { do_forget,      "FORGET"	     },
+	[TMFS_GETATTR]	   = { do_getattr,     "GETATTR"     },
+	[TMFS_SETATTR]	   = { do_setattr,     "SETATTR"     },
+	[TMFS_READLINK]	   = { do_readlink,    "READLINK"    },
+	[TMFS_SYMLINK]	   = { do_symlink,     "SYMLINK"     },
+	[TMFS_MKNOD]	   = { do_mknod,       "MKNOD"	     },
+	[TMFS_MKDIR]	   = { do_mkdir,       "MKDIR"	     },
+	[TMFS_UNLINK]	   = { do_unlink,      "UNLINK"	     },
+	[TMFS_RMDIR]	   = { do_rmdir,       "RMDIR"	     },
+	[TMFS_RENAME]	   = { do_rename,      "RENAME"	     },
+	[TMFS_LINK]	   = { do_link,	       "LINK"	     },
+	[TMFS_OPEN]	   = { do_open,	       "OPEN"	     },
+	[TMFS_READ]	   = { do_read,	       "READ"	     },
+	[TMFS_WRITE]	   = { do_write,       "WRITE"	     },
+	[TMFS_STATFS]	   = { do_statfs,      "STATFS"	     },
+	[TMFS_RELEASE]	   = { do_release,     "RELEASE"     },
+	[TMFS_FSYNC]	   = { do_fsync,       "FSYNC"	     },
+	[TMFS_SETXATTR]	   = { do_setxattr,    "SETXATTR"    },
+	[TMFS_GETXATTR]	   = { do_getxattr,    "GETXATTR"    },
+	[TMFS_LISTXATTR]   = { do_listxattr,   "LISTXATTR"   },
+	[TMFS_REMOVEXATTR] = { do_removexattr, "REMOVEXATTR" },
+	[TMFS_FLUSH]	   = { do_flush,       "FLUSH"	     },
+	[TMFS_INIT]	   = { do_init,	       "INIT"	     },
+	[TMFS_OPENDIR]	   = { do_opendir,     "OPENDIR"     },
+	[TMFS_READDIR]	   = { do_readdir,     "READDIR"     },
+	[TMFS_RELEASEDIR]  = { do_releasedir,  "RELEASEDIR"  },
+	[TMFS_FSYNCDIR]	   = { do_fsyncdir,    "FSYNCDIR"    },
+	[TMFS_GETLK]	   = { do_getlk,       "GETLK"	     },
+	[TMFS_SETLK]	   = { do_setlk,       "SETLK"	     },
+	[TMFS_SETLKW]	   = { do_setlkw,      "SETLKW"	     },
+	[TMFS_ACCESS]	   = { do_access,      "ACCESS"	     },
+	[TMFS_CREATE]	   = { do_create,      "CREATE"	     },
+	[TMFS_INTERRUPT]   = { do_interrupt,   "INTERRUPT"   },
+	[TMFS_BMAP]	   = { do_bmap,	       "BMAP"	     },
+	[TMFS_IOCTL]	   = { do_ioctl,       "IOCTL"	     },
+	[TMFS_POLL]	   = { do_poll,        "POLL"	     },
+	[TMFS_FALLOCATE]   = { do_fallocate,   "FALLOCATE"   },
+	[TMFS_DESTROY]	   = { do_destroy,     "DESTROY"     },
+	[TMFS_NOTIFY_REPLY] = { (void *) 1,    "NOTIFY_REPLY" },
+	[TMFS_BATCH_FORGET] = { do_batch_forget, "BATCH_FORGET" },
+	[TMCD_INIT]	   = { tmcd_lowlevel_init, "TMCD_INIT"   },
 };
 
-#define FUSE_MAXOP (sizeof(fuse_ll_ops) / sizeof(fuse_ll_ops[0]))
+#define TMFS_MAXOP (sizeof(tmfs_ll_ops) / sizeof(tmfs_ll_ops[0]))
 
-static const char *opname(enum fuse_opcode opcode)
+static const char *opname(enum tmfs_opcode opcode)
 {
-	if (opcode >= FUSE_MAXOP || !fuse_ll_ops[opcode].name)
+	if (opcode >= TMFS_MAXOP || !tmfs_ll_ops[opcode].name)
 		return "???";
 	else
-		return fuse_ll_ops[opcode].name;
+		return tmfs_ll_ops[opcode].name;
 }
 
-static int fuse_ll_copy_from_pipe(struct fuse_bufvec *dst,
-				  struct fuse_bufvec *src)
+static int tmfs_ll_copy_from_pipe(struct tmfs_bufvec *dst,
+				  struct tmfs_bufvec *src)
 {
-	int res = fuse_buf_copy(dst, src, 0);
+	int res = tmfs_buf_copy(dst, src, 0);
 	if (res < 0) {
-		fprintf(stderr, "fuse: copy from pipe: %s\n", strerror(-res));
+		fprintf(stderr, "tmfs: copy from pipe: %s\n", strerror(-res));
 		return res;
 	}
-	if (res < fuse_buf_size(dst)) {
-		fprintf(stderr, "fuse: copy from pipe: short read\n");
+	if (res < tmfs_buf_size(dst)) {
+		fprintf(stderr, "tmfs: copy from pipe: short read\n");
 		return -1;
 	}
 	return 0;
 }
 
-static void fuse_ll_process_buf(void *data, const struct fuse_buf *buf,
-				struct fuse_chan *ch)
+static void tmfs_ll_process_buf(void *data, const struct tmfs_buf *buf,
+				struct tmfs_chan *ch)
 {
-	struct fuse_ll *f = (struct fuse_ll *) data;
-	const size_t write_header_size = sizeof(struct fuse_in_header) +
-		sizeof(struct fuse_write_in);
-	struct fuse_bufvec bufv = { .buf[0] = *buf, .count = 1 };
-	struct fuse_bufvec tmpbuf = FUSE_BUFVEC_INIT(write_header_size);
-	struct fuse_in_header *in;
+	struct tmfs_ll *f = (struct tmfs_ll *) data;
+	const size_t write_header_size = sizeof(struct tmfs_in_header) +
+		sizeof(struct tmfs_write_in);
+	struct tmfs_bufvec bufv = { .buf[0] = *buf, .count = 1 };
+	struct tmfs_bufvec tmpbuf = TMFS_BUFVEC_INIT(write_header_size);
+	struct tmfs_in_header *in;
 	const void *inarg;
-	struct fuse_req *req;
+	struct tmfs_req *req;
 	void *mbuf = NULL;
 	int err;
 	int res;
 
-	if (buf->flags & FUSE_BUF_IS_FD) {
+	if (buf->flags & TMFS_BUF_IS_FD) {
 		if (buf->size < tmpbuf.buf[0].size)
 			tmpbuf.buf[0].size = buf->size;
 
 		mbuf = malloc(tmpbuf.buf[0].size);
 		if (mbuf == NULL) {
-			fprintf(stderr, "fuse: failed to allocate header\n");
+			fprintf(stderr, "tmfs: failed to allocate header\n");
 			goto clear_pipe;
 		}
 		tmpbuf.buf[0].mem = mbuf;
 
-		res = fuse_ll_copy_from_pipe(&tmpbuf, &bufv);
+		res = tmfs_ll_copy_from_pipe(&tmpbuf, &bufv);
 		if (res < 0)
 			goto clear_pipe;
 
@@ -2354,22 +2354,22 @@ static void fuse_ll_process_buf(void *data, const struct fuse_buf *buf,
 		fprintf(stderr,
 			"unique: %llu, opcode: %s (%i), nodeid: %lu, insize: %zu, pid: %u\n",
 			(unsigned long long) in->unique,
-			opname((enum fuse_opcode) in->opcode), in->opcode,
+			opname((enum tmfs_opcode) in->opcode), in->opcode,
 			(unsigned long) in->nodeid, buf->size, in->pid);
 	}
 
-	req = fuse_ll_alloc_req(f);
+	req = tmfs_ll_alloc_req(f);
 	if (req == NULL) {
-		struct fuse_out_header out = {
+		struct tmfs_out_header out = {
 			.unique = in->unique,
 			.error = -ENOMEM,
 		};
 		struct iovec iov = {
 			.iov_base = &out,
-			.iov_len = sizeof(struct fuse_out_header),
+			.iov_len = sizeof(struct tmfs_out_header),
 		};
 
-		fuse_send_msg(f, ch, &iov, 1);
+		tmfs_send_msg(f, ch, &iov, 1);
 		goto clear_pipe;
 	}
 
@@ -2381,39 +2381,39 @@ static void fuse_ll_process_buf(void *data, const struct fuse_buf *buf,
 
 	err = EIO;
 	if (!f->got_init) {
-		enum fuse_opcode expected;
+		enum tmfs_opcode expected;
 
-		expected = f->cuse_data ? CUSE_INIT : FUSE_INIT;
+		expected = f->tmcd_data ? TMCD_INIT : TMFS_INIT;
 		if (in->opcode != expected)
 			goto reply_err;
-	} else if (in->opcode == FUSE_INIT || in->opcode == CUSE_INIT)
+	} else if (in->opcode == TMFS_INIT || in->opcode == TMCD_INIT)
 		goto reply_err;
 
 	err = EACCES;
 	if (f->allow_root && in->uid != f->owner && in->uid != 0 &&
-		 in->opcode != FUSE_INIT && in->opcode != FUSE_READ &&
-		 in->opcode != FUSE_WRITE && in->opcode != FUSE_FSYNC &&
-		 in->opcode != FUSE_RELEASE && in->opcode != FUSE_READDIR &&
-		 in->opcode != FUSE_FSYNCDIR && in->opcode != FUSE_RELEASEDIR &&
-		 in->opcode != FUSE_NOTIFY_REPLY)
+		 in->opcode != TMFS_INIT && in->opcode != TMFS_READ &&
+		 in->opcode != TMFS_WRITE && in->opcode != TMFS_FSYNC &&
+		 in->opcode != TMFS_RELEASE && in->opcode != TMFS_READDIR &&
+		 in->opcode != TMFS_FSYNCDIR && in->opcode != TMFS_RELEASEDIR &&
+		 in->opcode != TMFS_NOTIFY_REPLY)
 		goto reply_err;
 
 	err = ENOSYS;
-	if (in->opcode >= FUSE_MAXOP || !fuse_ll_ops[in->opcode].func)
+	if (in->opcode >= TMFS_MAXOP || !tmfs_ll_ops[in->opcode].func)
 		goto reply_err;
-	if (in->opcode != FUSE_INTERRUPT) {
-		struct fuse_req *intr;
+	if (in->opcode != TMFS_INTERRUPT) {
+		struct tmfs_req *intr;
 		pthread_mutex_lock(&f->lock);
 		intr = check_interrupt(f, req);
 		list_add_req(req, &f->list);
 		pthread_mutex_unlock(&f->lock);
 		if (intr)
-			fuse_reply_err(intr, EAGAIN);
+			tmfs_reply_err(intr, EAGAIN);
 	}
 
-	if ((buf->flags & FUSE_BUF_IS_FD) && write_header_size < buf->size &&
-	    (in->opcode != FUSE_WRITE || !f->op.write_buf) &&
-	    in->opcode != FUSE_NOTIFY_REPLY) {
+	if ((buf->flags & TMFS_BUF_IS_FD) && write_header_size < buf->size &&
+	    (in->opcode != TMFS_WRITE || !f->op.write_buf) &&
+	    in->opcode != TMFS_NOTIFY_REPLY) {
 		void *newmbuf;
 
 		err = ENOMEM;
@@ -2422,10 +2422,10 @@ static void fuse_ll_process_buf(void *data, const struct fuse_buf *buf,
 			goto reply_err;
 		mbuf = newmbuf;
 
-		tmpbuf = FUSE_BUFVEC_INIT(buf->size - write_header_size);
+		tmpbuf = TMFS_BUFVEC_INIT(buf->size - write_header_size);
 		tmpbuf.buf[0].mem = mbuf + write_header_size;
 
-		res = fuse_ll_copy_from_pipe(&tmpbuf, &bufv);
+		res = tmfs_ll_copy_from_pipe(&tmpbuf, &bufv);
 		err = -res;
 		if (res < 0)
 			goto reply_err;
@@ -2434,34 +2434,34 @@ static void fuse_ll_process_buf(void *data, const struct fuse_buf *buf,
 	}
 
 	inarg = (void *) &in[1];
-	if (in->opcode == FUSE_WRITE && f->op.write_buf)
+	if (in->opcode == TMFS_WRITE && f->op.write_buf)
 		do_write_buf(req, in->nodeid, inarg, buf);
-	else if (in->opcode == FUSE_NOTIFY_REPLY)
+	else if (in->opcode == TMFS_NOTIFY_REPLY)
 		do_notify_reply(req, in->nodeid, inarg, buf);
 	else
-		fuse_ll_ops[in->opcode].func(req, in->nodeid, inarg);
+		tmfs_ll_ops[in->opcode].func(req, in->nodeid, inarg);
 
 out_free:
 	free(mbuf);
 	return;
 
 reply_err:
-	fuse_reply_err(req, err);
+	tmfs_reply_err(req, err);
 clear_pipe:
-	if (buf->flags & FUSE_BUF_IS_FD)
-		fuse_ll_clear_pipe(f);
+	if (buf->flags & TMFS_BUF_IS_FD)
+		tmfs_ll_clear_pipe(f);
 	goto out_free;
 }
 
-static void fuse_ll_process(void *data, const char *buf, size_t len,
-			    struct fuse_chan *ch)
+static void tmfs_ll_process(void *data, const char *buf, size_t len,
+			    struct tmfs_chan *ch)
 {
-	struct fuse_buf fbuf = {
+	struct tmfs_buf fbuf = {
 		.mem = (void *) buf,
 		.size = len,
 	};
 
-	fuse_ll_process_buf(data, &fbuf, ch);
+	tmfs_ll_process_buf(data, &fbuf, ch);
 }
 
 enum {
@@ -2469,44 +2469,44 @@ enum {
 	KEY_VERSION,
 };
 
-static const struct fuse_opt fuse_ll_opts[] = {
-	{ "debug", offsetof(struct fuse_ll, debug), 1 },
-	{ "-d", offsetof(struct fuse_ll, debug), 1 },
-	{ "allow_root", offsetof(struct fuse_ll, allow_root), 1 },
-	{ "max_write=%u", offsetof(struct fuse_ll, conn.max_write), 0 },
-	{ "max_readahead=%u", offsetof(struct fuse_ll, conn.max_readahead), 0 },
-	{ "max_background=%u", offsetof(struct fuse_ll, conn.max_background), 0 },
+static const struct tmfs_opt tmfs_ll_opts[] = {
+	{ "debug", offsetof(struct tmfs_ll, debug), 1 },
+	{ "-d", offsetof(struct tmfs_ll, debug), 1 },
+	{ "allow_root", offsetof(struct tmfs_ll, allow_root), 1 },
+	{ "max_write=%u", offsetof(struct tmfs_ll, conn.max_write), 0 },
+	{ "max_readahead=%u", offsetof(struct tmfs_ll, conn.max_readahead), 0 },
+	{ "max_background=%u", offsetof(struct tmfs_ll, conn.max_background), 0 },
 	{ "congestion_threshold=%u",
-	  offsetof(struct fuse_ll, conn.congestion_threshold), 0 },
-	{ "async_read", offsetof(struct fuse_ll, conn.async_read), 1 },
-	{ "sync_read", offsetof(struct fuse_ll, conn.async_read), 0 },
-	{ "atomic_o_trunc", offsetof(struct fuse_ll, atomic_o_trunc), 1},
-	{ "no_remote_lock", offsetof(struct fuse_ll, no_remote_posix_lock), 1},
-	{ "no_remote_lock", offsetof(struct fuse_ll, no_remote_flock), 1},
-	{ "no_remote_flock", offsetof(struct fuse_ll, no_remote_flock), 1},
-	{ "no_remote_posix_lock", offsetof(struct fuse_ll, no_remote_posix_lock), 1},
-	{ "big_writes", offsetof(struct fuse_ll, big_writes), 1},
-	{ "splice_write", offsetof(struct fuse_ll, splice_write), 1},
-	{ "no_splice_write", offsetof(struct fuse_ll, no_splice_write), 1},
-	{ "splice_move", offsetof(struct fuse_ll, splice_move), 1},
-	{ "no_splice_move", offsetof(struct fuse_ll, no_splice_move), 1},
-	{ "splice_read", offsetof(struct fuse_ll, splice_read), 1},
-	{ "no_splice_read", offsetof(struct fuse_ll, no_splice_read), 1},
-	FUSE_OPT_KEY("max_read=", FUSE_OPT_KEY_DISCARD),
-	FUSE_OPT_KEY("-h", KEY_HELP),
-	FUSE_OPT_KEY("--help", KEY_HELP),
-	FUSE_OPT_KEY("-V", KEY_VERSION),
-	FUSE_OPT_KEY("--version", KEY_VERSION),
-	FUSE_OPT_END
+	  offsetof(struct tmfs_ll, conn.congestion_threshold), 0 },
+	{ "async_read", offsetof(struct tmfs_ll, conn.async_read), 1 },
+	{ "sync_read", offsetof(struct tmfs_ll, conn.async_read), 0 },
+	{ "atomic_o_trunc", offsetof(struct tmfs_ll, atomic_o_trunc), 1},
+	{ "no_remote_lock", offsetof(struct tmfs_ll, no_remote_posix_lock), 1},
+	{ "no_remote_lock", offsetof(struct tmfs_ll, no_remote_flock), 1},
+	{ "no_remote_flock", offsetof(struct tmfs_ll, no_remote_flock), 1},
+	{ "no_remote_posix_lock", offsetof(struct tmfs_ll, no_remote_posix_lock), 1},
+	{ "big_writes", offsetof(struct tmfs_ll, big_writes), 1},
+	{ "splice_write", offsetof(struct tmfs_ll, splice_write), 1},
+	{ "no_splice_write", offsetof(struct tmfs_ll, no_splice_write), 1},
+	{ "splice_move", offsetof(struct tmfs_ll, splice_move), 1},
+	{ "no_splice_move", offsetof(struct tmfs_ll, no_splice_move), 1},
+	{ "splice_read", offsetof(struct tmfs_ll, splice_read), 1},
+	{ "no_splice_read", offsetof(struct tmfs_ll, no_splice_read), 1},
+	TMFS_OPT_KEY("max_read=", TMFS_OPT_KEY_DISCARD),
+	TMFS_OPT_KEY("-h", KEY_HELP),
+	TMFS_OPT_KEY("--help", KEY_HELP),
+	TMFS_OPT_KEY("-V", KEY_VERSION),
+	TMFS_OPT_KEY("--version", KEY_VERSION),
+	TMFS_OPT_END
 };
 
-static void fuse_ll_version(void)
+static void tmfs_ll_version(void)
 {
-	fprintf(stderr, "using FUSE kernel interface version %i.%i\n",
-		FUSE_KERNEL_VERSION, FUSE_KERNEL_MINOR_VERSION);
+	fprintf(stderr, "using TMFS kernel interface version %i.%i\n",
+		TMFS_KERNEL_VERSION, TMFS_KERNEL_MINOR_VERSION);
 }
 
-static void fuse_ll_help(void)
+static void tmfs_ll_help(void)
 {
 	fprintf(stderr,
 "    -o max_write=N         set maximum size of write requests\n"
@@ -2520,42 +2520,42 @@ static void fuse_ll_help(void)
 "    -o no_remote_lock      disable remote file locking\n"
 "    -o no_remote_flock     disable remote file locking (BSD)\n"
 "    -o no_remote_posix_lock disable remove file locking (POSIX)\n"
-"    -o [no_]splice_write   use splice to write to the fuse device\n"
-"    -o [no_]splice_move    move data while splicing to the fuse device\n"
-"    -o [no_]splice_read    use splice to read from the fuse device\n"
+"    -o [no_]splice_write   use splice to write to the tmfs device\n"
+"    -o [no_]splice_move    move data while splicing to the tmfs device\n"
+"    -o [no_]splice_read    use splice to read from the tmfs device\n"
 );
 }
 
-static int fuse_ll_opt_proc(void *data, const char *arg, int key,
-			    struct fuse_args *outargs)
+static int tmfs_ll_opt_proc(void *data, const char *arg, int key,
+			    struct tmfs_args *outargs)
 {
 	(void) data; (void) outargs;
 
 	switch (key) {
 	case KEY_HELP:
-		fuse_ll_help();
+		tmfs_ll_help();
 		break;
 
 	case KEY_VERSION:
-		fuse_ll_version();
+		tmfs_ll_version();
 		break;
 
 	default:
-		fprintf(stderr, "fuse: unknown option `%s'\n", arg);
+		fprintf(stderr, "tmfs: unknown option `%s'\n", arg);
 	}
 
 	return -1;
 }
 
-int fuse_lowlevel_is_lib_option(const char *opt)
+int tmfs_lowlevel_is_lib_option(const char *opt)
 {
-	return fuse_opt_match(fuse_ll_opts, opt);
+	return tmfs_opt_match(tmfs_ll_opts, opt);
 }
 
-static void fuse_ll_destroy(void *data)
+static void tmfs_ll_destroy(void *data)
 {
-	struct fuse_ll *f = (struct fuse_ll *) data;
-	struct fuse_ll_pipe *llp;
+	struct tmfs_ll *f = (struct tmfs_ll *) data;
+	struct tmfs_ll_pipe *llp;
 
 	if (f->got_init && !f->got_destroy) {
 		if (f->op.destroy)
@@ -2563,35 +2563,35 @@ static void fuse_ll_destroy(void *data)
 	}
 	llp = pthread_getspecific(f->pipe_key);
 	if (llp != NULL)
-		fuse_ll_pipe_free(llp);
+		tmfs_ll_pipe_free(llp);
 	pthread_key_delete(f->pipe_key);
 	pthread_mutex_destroy(&f->lock);
-	free(f->cuse_data);
+	free(f->tmcd_data);
 	free(f);
 }
 
-static void fuse_ll_pipe_destructor(void *data)
+static void tmfs_ll_pipe_destructor(void *data)
 {
-	struct fuse_ll_pipe *llp = data;
-	fuse_ll_pipe_free(llp);
+	struct tmfs_ll_pipe *llp = data;
+	tmfs_ll_pipe_free(llp);
 }
 
 #ifdef HAVE_SPLICE
-static int fuse_ll_receive_buf(struct fuse_session *se, struct fuse_buf *buf,
-			       struct fuse_chan **chp)
+static int tmfs_ll_receive_buf(struct tmfs_session *se, struct tmfs_buf *buf,
+			       struct tmfs_chan **chp)
 {
-	struct fuse_chan *ch = *chp;
-	struct fuse_ll *f = fuse_session_data(se);
+	struct tmfs_chan *ch = *chp;
+	struct tmfs_ll *f = tmfs_session_data(se);
 	size_t bufsize = buf->size;
-	struct fuse_ll_pipe *llp;
-	struct fuse_buf tmpbuf;
+	struct tmfs_ll_pipe *llp;
+	struct tmfs_buf tmpbuf;
 	int err;
 	int res;
 
-	if (f->conn.proto_minor < 14 || !(f->conn.want & FUSE_CAP_SPLICE_READ))
+	if (f->conn.proto_minor < 14 || !(f->conn.want & TMFS_CAP_SPLICE_READ))
 		goto fallback;
 
-	llp = fuse_ll_get_pipe(f);
+	llp = tmfs_ll_get_pipe(f);
 	if (llp == NULL)
 		goto fallback;
 
@@ -2608,53 +2608,53 @@ static int fuse_ll_receive_buf(struct fuse_session *se, struct fuse_buf *buf,
 			goto fallback;
 	}
 
-	res = splice(fuse_chan_fd(ch), NULL, llp->pipe[1], NULL, bufsize, 0);
+	res = splice(tmfs_chan_fd(ch), NULL, llp->pipe[1], NULL, bufsize, 0);
 	err = errno;
 
-	if (fuse_session_exited(se))
+	if (tmfs_session_exited(se))
 		return 0;
 
 	if (res == -1) {
 		if (err == ENODEV) {
-			fuse_session_exit(se);
+			tmfs_session_exit(se);
 			return 0;
 		}
 		if (err != EINTR && err != EAGAIN)
-			perror("fuse: splice from device");
+			perror("tmfs: splice from device");
 		return -err;
 	}
 
-	if (res < sizeof(struct fuse_in_header)) {
-		fprintf(stderr, "short splice from fuse device\n");
+	if (res < sizeof(struct tmfs_in_header)) {
+		fprintf(stderr, "short splice from tmfs device\n");
 		return -EIO;
 	}
 
-	tmpbuf = (struct fuse_buf) {
+	tmpbuf = (struct tmfs_buf) {
 		.size = res,
-		.flags = FUSE_BUF_IS_FD,
+		.flags = TMFS_BUF_IS_FD,
 		.fd = llp->pipe[0],
 	};
 
 	/*
 	 * Don't bother with zero copy for small requests.
-	 * fuse_loop_mt() needs to check for FORGET so this more than
+	 * tmfs_loop_mt() needs to check for FORGET so this more than
 	 * just an optimization.
 	 */
-	if (res < sizeof(struct fuse_in_header) +
-	    sizeof(struct fuse_write_in) + pagesize) {
-		struct fuse_bufvec src = { .buf[0] = tmpbuf, .count = 1 };
-		struct fuse_bufvec dst = { .buf[0] = *buf, .count = 1 };
+	if (res < sizeof(struct tmfs_in_header) +
+	    sizeof(struct tmfs_write_in) + pagesize) {
+		struct tmfs_bufvec src = { .buf[0] = tmpbuf, .count = 1 };
+		struct tmfs_bufvec dst = { .buf[0] = *buf, .count = 1 };
 
-		res = fuse_buf_copy(&dst, &src, 0);
+		res = tmfs_buf_copy(&dst, &src, 0);
 		if (res < 0) {
-			fprintf(stderr, "fuse: copy from pipe: %s\n",
+			fprintf(stderr, "tmfs: copy from pipe: %s\n",
 				strerror(-res));
-			fuse_ll_clear_pipe(f);
+			tmfs_ll_clear_pipe(f);
 			return res;
 		}
 		if (res < tmpbuf.size) {
-			fprintf(stderr, "fuse: copy from pipe: short read\n");
-			fuse_ll_clear_pipe(f);
+			fprintf(stderr, "tmfs: copy from pipe: short read\n");
+			tmfs_ll_clear_pipe(f);
 			return -EIO;
 		}
 		buf->size = tmpbuf.size;
@@ -2666,7 +2666,7 @@ static int fuse_ll_receive_buf(struct fuse_session *se, struct fuse_buf *buf,
 	return res;
 
 fallback:
-	res = fuse_chan_recv(chp, buf->mem, bufsize);
+	res = tmfs_chan_recv(chp, buf->mem, bufsize);
 	if (res <= 0)
 		return res;
 
@@ -2675,12 +2675,12 @@ fallback:
 	return res;
 }
 #else
-static int fuse_ll_receive_buf(struct fuse_session *se, struct fuse_buf *buf,
-			       struct fuse_chan **chp)
+static int tmfs_ll_receive_buf(struct tmfs_session *se, struct tmfs_buf *buf,
+			       struct tmfs_chan **chp)
 {
 	(void) se;
 
-	int res = fuse_chan_recv(chp, buf->mem, buf->size);
+	int res = tmfs_chan_recv(chp, buf->mem, buf->size);
 	if (res <= 0)
 		return res;
 
@@ -2692,30 +2692,30 @@ static int fuse_ll_receive_buf(struct fuse_session *se, struct fuse_buf *buf,
 
 
 /*
- * always call fuse_lowlevel_new_common() internally, to work around a
+ * always call tmfs_lowlevel_new_common() internally, to work around a
  * misfeature in the FreeBSD runtime linker, which links the old
  * version of a symbol to internal references.
  */
-struct fuse_session *fuse_lowlevel_new_common(struct fuse_args *args,
-					      const struct fuse_lowlevel_ops *op,
+struct tmfs_session *tmfs_lowlevel_new_common(struct tmfs_args *args,
+					      const struct tmfs_lowlevel_ops *op,
 					      size_t op_size, void *userdata)
 {
 	int err;
-	struct fuse_ll *f;
-	struct fuse_session *se;
-	struct fuse_session_ops sop = {
-		.process = fuse_ll_process,
-		.destroy = fuse_ll_destroy,
+	struct tmfs_ll *f;
+	struct tmfs_session *se;
+	struct tmfs_session_ops sop = {
+		.process = tmfs_ll_process,
+		.destroy = tmfs_ll_destroy,
 	};
 
-	if (sizeof(struct fuse_lowlevel_ops) < op_size) {
-		fprintf(stderr, "fuse: warning: library too old, some operations may not work\n");
-		op_size = sizeof(struct fuse_lowlevel_ops);
+	if (sizeof(struct tmfs_lowlevel_ops) < op_size) {
+		fprintf(stderr, "tmfs: warning: library too old, some operations may not work\n");
+		op_size = sizeof(struct tmfs_lowlevel_ops);
 	}
 
-	f = (struct fuse_ll *) calloc(1, sizeof(struct fuse_ll));
+	f = (struct tmfs_ll *) calloc(1, sizeof(struct tmfs_ll));
 	if (f == NULL) {
-		fprintf(stderr, "fuse: failed to allocate fuse object\n");
+		fprintf(stderr, "tmfs: failed to allocate tmfs object\n");
 		goto out;
 	}
 
@@ -2727,31 +2727,31 @@ struct fuse_session *fuse_lowlevel_new_common(struct fuse_args *args,
 	list_init_req(&f->interrupts);
 	list_init_nreq(&f->notify_list);
 	f->notify_ctr = 1;
-	fuse_mutex_init(&f->lock);
+	tmfs_mutex_init(&f->lock);
 
-	err = pthread_key_create(&f->pipe_key, fuse_ll_pipe_destructor);
+	err = pthread_key_create(&f->pipe_key, tmfs_ll_pipe_destructor);
 	if (err) {
-		fprintf(stderr, "fuse: failed to create thread specific key: %s\n",
+		fprintf(stderr, "tmfs: failed to create thread specific key: %s\n",
 			strerror(err));
 		goto out_free;
 	}
 
-	if (fuse_opt_parse(args, f, fuse_ll_opts, fuse_ll_opt_proc) == -1)
+	if (tmfs_opt_parse(args, f, tmfs_ll_opts, tmfs_ll_opt_proc) == -1)
 		goto out_key_destroy;
 
 	if (f->debug)
-		fprintf(stderr, "FUSE library version: %s\n", PACKAGE_VERSION);
+		fprintf(stderr, "TMFS library version: %s\n", PACKAGE_VERSION);
 
 	memcpy(&f->op, op, op_size);
 	f->owner = getuid();
 	f->userdata = userdata;
 
-	se = fuse_session_new(&sop, f);
+	se = tmfs_session_new(&sop, f);
 	if (!se)
 		goto out_key_destroy;
 
-	se->receive_buf = fuse_ll_receive_buf;
-	se->process_buf = fuse_ll_process_buf;
+	se->receive_buf = tmfs_ll_receive_buf;
+	se->process_buf = tmfs_ll_process_buf;
 
 	return se;
 
@@ -2765,15 +2765,15 @@ out:
 }
 
 
-struct fuse_session *fuse_lowlevel_new(struct fuse_args *args,
-				       const struct fuse_lowlevel_ops *op,
+struct tmfs_session *tmfs_lowlevel_new(struct tmfs_args *args,
+				       const struct tmfs_lowlevel_ops *op,
 				       size_t op_size, void *userdata)
 {
-	return fuse_lowlevel_new_common(args, op, op_size, userdata);
+	return tmfs_lowlevel_new_common(args, op, op_size, userdata);
 }
 
 #ifdef linux
-int fuse_req_getgroups(fuse_req_t req, int size, gid_t list[])
+int tmfs_req_getgroups(tmfs_req_t req, int size, gid_t list[])
 {
 	char *buf;
 	size_t bufsize = 1024;
@@ -2835,7 +2835,7 @@ out_free:
 /*
  * This is currently not implemented on other than Linux...
  */
-int fuse_req_getgroups(fuse_req_t req, int size, gid_t list[])
+int tmfs_req_getgroups(tmfs_req_t req, int size, gid_t list[])
 {
 	return -ENOSYS;
 }
@@ -2843,8 +2843,8 @@ int fuse_req_getgroups(fuse_req_t req, int size, gid_t list[])
 
 #if !defined(__FreeBSD__) && !defined(__NetBSD__)
 
-static void fill_open_compat(struct fuse_open_out *arg,
-			     const struct fuse_file_info_compat *f)
+static void fill_open_compat(struct tmfs_open_out *arg,
+			     const struct tmfs_file_info_compat *f)
 {
 	arg->fh = f->fh;
 	if (f->direct_io)
@@ -2865,87 +2865,87 @@ static void convert_statfs_compat(const struct statfs *compatbuf,
 	buf->f_namemax	= compatbuf->f_namelen;
 }
 
-int fuse_reply_open_compat(fuse_req_t req,
-			   const struct fuse_file_info_compat *f)
+int tmfs_reply_open_compat(tmfs_req_t req,
+			   const struct tmfs_file_info_compat *f)
 {
-	struct fuse_open_out arg;
+	struct tmfs_open_out arg;
 
 	memset(&arg, 0, sizeof(arg));
 	fill_open_compat(&arg, f);
 	return send_reply_ok(req, &arg, sizeof(arg));
 }
 
-int fuse_reply_statfs_compat(fuse_req_t req, const struct statfs *stbuf)
+int tmfs_reply_statfs_compat(tmfs_req_t req, const struct statfs *stbuf)
 {
 	struct statvfs newbuf;
 
 	memset(&newbuf, 0, sizeof(newbuf));
 	convert_statfs_compat(stbuf, &newbuf);
 
-	return fuse_reply_statfs(req, &newbuf);
+	return tmfs_reply_statfs(req, &newbuf);
 }
 
-struct fuse_session *fuse_lowlevel_new_compat(const char *opts,
-				const struct fuse_lowlevel_ops_compat *op,
+struct tmfs_session *tmfs_lowlevel_new_compat(const char *opts,
+				const struct tmfs_lowlevel_ops_compat *op,
 				size_t op_size, void *userdata)
 {
-	struct fuse_session *se;
-	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
+	struct tmfs_session *se;
+	struct tmfs_args args = TMFS_ARGS_INIT(0, NULL);
 
 	if (opts &&
-	    (fuse_opt_add_arg(&args, "") == -1 ||
-	     fuse_opt_add_arg(&args, "-o") == -1 ||
-	     fuse_opt_add_arg(&args, opts) == -1)) {
-		fuse_opt_free_args(&args);
+	    (tmfs_opt_add_arg(&args, "") == -1 ||
+	     tmfs_opt_add_arg(&args, "-o") == -1 ||
+	     tmfs_opt_add_arg(&args, opts) == -1)) {
+		tmfs_opt_free_args(&args);
 		return NULL;
 	}
-	se = fuse_lowlevel_new(&args, (const struct fuse_lowlevel_ops *) op,
+	se = tmfs_lowlevel_new(&args, (const struct tmfs_lowlevel_ops *) op,
 			       op_size, userdata);
-	fuse_opt_free_args(&args);
+	tmfs_opt_free_args(&args);
 
 	return se;
 }
 
-struct fuse_ll_compat_conf {
+struct tmfs_ll_compat_conf {
 	unsigned max_read;
 	int set_max_read;
 };
 
-static const struct fuse_opt fuse_ll_opts_compat[] = {
-	{ "max_read=", offsetof(struct fuse_ll_compat_conf, set_max_read), 1 },
-	{ "max_read=%u", offsetof(struct fuse_ll_compat_conf, max_read), 0 },
-	FUSE_OPT_KEY("max_read=", FUSE_OPT_KEY_KEEP),
-	FUSE_OPT_END
+static const struct tmfs_opt tmfs_ll_opts_compat[] = {
+	{ "max_read=", offsetof(struct tmfs_ll_compat_conf, set_max_read), 1 },
+	{ "max_read=%u", offsetof(struct tmfs_ll_compat_conf, max_read), 0 },
+	TMFS_OPT_KEY("max_read=", TMFS_OPT_KEY_KEEP),
+	TMFS_OPT_END
 };
 
-int fuse_sync_compat_args(struct fuse_args *args)
+int tmfs_sync_compat_args(struct tmfs_args *args)
 {
-	struct fuse_ll_compat_conf conf;
+	struct tmfs_ll_compat_conf conf;
 
 	memset(&conf, 0, sizeof(conf));
-	if (fuse_opt_parse(args, &conf, fuse_ll_opts_compat, NULL) == -1)
+	if (tmfs_opt_parse(args, &conf, tmfs_ll_opts_compat, NULL) == -1)
 		return -1;
 
-	if (fuse_opt_insert_arg(args, 1, "-osync_read"))
+	if (tmfs_opt_insert_arg(args, 1, "-osync_read"))
 		return -1;
 
 	if (conf.set_max_read) {
 		char tmpbuf[64];
 
 		sprintf(tmpbuf, "-omax_readahead=%u", conf.max_read);
-		if (fuse_opt_insert_arg(args, 1, tmpbuf) == -1)
+		if (tmfs_opt_insert_arg(args, 1, tmpbuf) == -1)
 			return -1;
 	}
 	return 0;
 }
 
-FUSE_SYMVER(".symver fuse_reply_statfs_compat,fuse_reply_statfs@FUSE_2.4");
-FUSE_SYMVER(".symver fuse_reply_open_compat,fuse_reply_open@FUSE_2.4");
-FUSE_SYMVER(".symver fuse_lowlevel_new_compat,fuse_lowlevel_new@FUSE_2.4");
+TMFS_SYMVER(".symver tmfs_reply_statfs_compat,tmfs_reply_statfs@TMFS_2.4");
+TMFS_SYMVER(".symver tmfs_reply_open_compat,tmfs_reply_open@TMFS_2.4");
+TMFS_SYMVER(".symver tmfs_lowlevel_new_compat,tmfs_lowlevel_new@TMFS_2.4");
 
 #else /* __FreeBSD__ || __NetBSD__ */
 
-int fuse_sync_compat_args(struct fuse_args *args)
+int tmfs_sync_compat_args(struct tmfs_args *args)
 {
 	(void) args;
 	return 0;
@@ -2953,16 +2953,16 @@ int fuse_sync_compat_args(struct fuse_args *args)
 
 #endif /* __FreeBSD__ || __NetBSD__ */
 
-struct fuse_session *fuse_lowlevel_new_compat25(struct fuse_args *args,
-				const struct fuse_lowlevel_ops_compat25 *op,
+struct tmfs_session *tmfs_lowlevel_new_compat25(struct tmfs_args *args,
+				const struct tmfs_lowlevel_ops_compat25 *op,
 				size_t op_size, void *userdata)
 {
-	if (fuse_sync_compat_args(args) == -1)
+	if (tmfs_sync_compat_args(args) == -1)
 		return NULL;
 
-	return fuse_lowlevel_new_common(args,
-					(const struct fuse_lowlevel_ops *) op,
+	return tmfs_lowlevel_new_common(args,
+					(const struct tmfs_lowlevel_ops *) op,
 					op_size, userdata);
 }
 
-FUSE_SYMVER(".symver fuse_lowlevel_new_compat25,fuse_lowlevel_new@FUSE_2.5");
+TMFS_SYMVER(".symver tmfs_lowlevel_new_compat25,tmfs_lowlevel_new@TMFS_2.5");
