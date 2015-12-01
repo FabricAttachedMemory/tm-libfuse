@@ -1,5 +1,5 @@
 /*
-  FUSE-ioctl: ioctl support for FUSE
+  TMFS-ioctl: ioctl support for TMFS
   Copyright (C) 2008       SUSE Linux Products GmbH
   Copyright (C) 2008       Tejun Heo <teheo@suse.de>
 

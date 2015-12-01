@@ -1,16 +1,16 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU GPL.
   See the file COPYING.
 
-  gcc -Wall hello.c `pkg-config fuse --cflags --libs` -o hello
+  gcc -Wall hello.c `pkg-config tmfs --cflags --libs` -o hello
 */
 
-#define FUSE_USE_VERSION 26
+#define TMFS_USE_VERSION 26
 
-#include <fuse.h>
+#include <tmfs.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -37,8 +37,8 @@ static int hello_getattr(const char *path, struct stat *stbuf)
 	return res;
 }
 
-static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-			 off_t offset, struct fuse_file_info *fi)
+static int hello_readdir(const char *path, void *buf, tmfs_fill_dir_t filler,
+			 off_t offset, struct tmfs_file_info *fi)
 {
 	(void) offset;
 	(void) fi;
@@ -53,7 +53,7 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return 0;
 }
 
-static int hello_open(const char *path, struct fuse_file_info *fi)
+static int hello_open(const char *path, struct tmfs_file_info *fi)
 {
 	if (strcmp(path, hello_path) != 0)
 		return -ENOENT;
@@ -65,7 +65,7 @@ static int hello_open(const char *path, struct fuse_file_info *fi)
 }
 
 static int hello_read(const char *path, char *buf, size_t size, off_t offset,
-		      struct fuse_file_info *fi)
+		      struct tmfs_file_info *fi)
 {
 	size_t len;
 	(void) fi;
@@ -83,7 +83,7 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 	return size;
 }
 
-static struct fuse_operations hello_oper = {
+static struct tmfs_operations hello_oper = {
 	.getattr	= hello_getattr,
 	.readdir	= hello_readdir,
 	.open		= hello_open,
@@ -92,5 +92,5 @@ static struct fuse_operations hello_oper = {
 
 int main(int argc, char *argv[])
 {
-	return fuse_main(argc, argv, &hello_oper, NULL);
+	return tmfs_main(argc, argv, &hello_oper, NULL);
 }

@@ -1,16 +1,16 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU GPL.
   See the file COPYING.
 
-  gcc -Wall null.c `pkg-config fuse --cflags --libs` -o null
+  gcc -Wall null.c `pkg-config tmfs --cflags --libs` -o null
 */
 
-#define FUSE_USE_VERSION 26
+#define TMFS_USE_VERSION 26
 
-#include <fuse.h>
+#include <tmfs.h>
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
@@ -42,7 +42,7 @@ static int null_truncate(const char *path, off_t size)
 	return 0;
 }
 
-static int null_open(const char *path, struct fuse_file_info *fi)
+static int null_open(const char *path, struct tmfs_file_info *fi)
 {
 	(void) fi;
 
@@ -53,7 +53,7 @@ static int null_open(const char *path, struct fuse_file_info *fi)
 }
 
 static int null_read(const char *path, char *buf, size_t size,
-		     off_t offset, struct fuse_file_info *fi)
+		     off_t offset, struct tmfs_file_info *fi)
 {
 	(void) buf;
 	(void) offset;
@@ -69,7 +69,7 @@ static int null_read(const char *path, char *buf, size_t size,
 }
 
 static int null_write(const char *path, const char *buf, size_t size,
-		      off_t offset, struct fuse_file_info *fi)
+		      off_t offset, struct tmfs_file_info *fi)
 {
 	(void) buf;
 	(void) offset;
@@ -81,7 +81,7 @@ static int null_write(const char *path, const char *buf, size_t size,
 	return size;
 }
 
-static struct fuse_operations null_oper = {
+static struct tmfs_operations null_oper = {
 	.getattr	= null_getattr,
 	.truncate	= null_truncate,
 	.open		= null_open,
@@ -91,5 +91,5 @@ static struct fuse_operations null_oper = {
 
 int main(int argc, char *argv[])
 {
-	return fuse_main(argc, argv, &null_oper, NULL);
+	return tmfs_main(argc, argv, &null_oper, NULL);
 }
