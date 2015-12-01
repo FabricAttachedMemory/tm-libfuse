@@ -1,5 +1,5 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU GPL.
@@ -93,9 +93,9 @@ int main(int argc, char *argv[])
 	else
 		basename = argv[0];
 
-	if (strncmp(basename, "mount.fuse.", 11) == 0)
+	if (strncmp(basename, "mount.tmfs.", 11) == 0)
 		type = basename + 11;
-	if (strncmp(basename, "mount.fuseblk.", 14) == 0)
+	if (strncmp(basename, "mount.tmfsblk.", 14) == 0)
 		type = basename + 14;
 
 	if (type && !type[0])
@@ -127,9 +127,9 @@ int main(int argc, char *argv[])
 				exit(1);
 			}
 			type = argv[i];
-			if (strncmp(type, "fuse.", 5) == 0)
+			if (strncmp(type, "tmfs.", 5) == 0)
 				type += 5;
-			else if (strncmp(type, "fuseblk.", 8) == 0)
+			else if (strncmp(type, "tmfsblk.", 8) == 0)
 				type += 8;
 
 			if (!type[0]) {
