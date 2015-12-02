@@ -1,5 +1,5 @@
 /*
-  FUSE fioclient: FUSE ioctl example client
+  TMFS fioclient: TMFS ioctl example client
   Copyright (C) 2008       SUSE Linux Products GmbH
   Copyright (C) 2008       Tejun Heo <teheo@suse.de>
 

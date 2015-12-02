@@ -1,4 +1,4 @@
-AC_INIT(fuse, 2.9.4)
+AC_INIT(tmfs, 2.9.4)
 
 AC_PREREQ(2.59d)
 AC_CONFIG_MACRO_DIR([m4])
@@ -61,7 +61,7 @@ AC_CHECK_MEMBERS([struct stat.st_atimespec])
 LIBS=
 AC_SEARCH_LIBS(dlopen, [dl])
 AC_SEARCH_LIBS(clock_gettime, [rt])
-libfuse_libs=$LIBS
+libtmfs_libs=$LIBS
 LIBS=
 AC_ARG_WITH([libiconv-prefix],
 [  --with-libiconv-prefix=DIR  search for libiconv in DIR/include and DIR/lib], [
@@ -71,15 +71,15 @@ AC_ARG_WITH([libiconv-prefix],
     done
    ])
 AM_ICONV
-libfuse_libs="$libfuse_libs $LTLIBICONV"
+libtmfs_libs="$libtmfs_libs $LTLIBICONV"
 AM_CONDITIONAL(ICONV, test "$am_cv_func_iconv" = yes)
-AC_SUBST(libfuse_libs)
+AC_SUBST(libtmfs_libs)
 
-if test -z "$MOUNT_FUSE_PATH"; then
-	MOUNT_FUSE_PATH=/sbin
-	AC_MSG_NOTICE([MOUNT_FUSE_PATH env var not set, using default $MOUNT_FUSE_PATH])
+if test -z "$MOUNT_TMFS_PATH"; then
+	MOUNT_TMFS_PATH=/sbin
+	AC_MSG_NOTICE([MOUNT_TMFS_PATH env var not set, using default $MOUNT_TMFS_PATH])
 fi
-AC_SUBST(MOUNT_FUSE_PATH)
+AC_SUBST(MOUNT_TMFS_PATH)
 if test -z "$UDEV_RULES_PATH"; then
 	UDEV_RULES_PATH=/etc/udev/rules.d
 	AC_MSG_NOTICE([UDEV_RULES_PATH env var not set, using default $UDEV_RULES_PATH])
@@ -115,7 +115,7 @@ if test "$arch" = linux -a "$cross_compiling" != "yes"; then
 	fi
 fi
 
-AC_CONFIG_FILES([fuse.pc Makefile lib/Makefile util/Makefile example/Makefile include/Makefile doc/Makefile])
+AC_CONFIG_FILES([tmfs.pc Makefile lib/Makefile util/Makefile example/Makefile include/Makefile doc/Makefile])
 AC_OUTPUT
 
 if test "$util_linux_ok" = no; then

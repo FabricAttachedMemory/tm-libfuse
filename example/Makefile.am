@@ -2,11 +2,11 @@
 
 AM_CPPFLAGS = -I$(top_srcdir)/include -D_FILE_OFFSET_BITS=64 -D_REENTRANT
 noinst_HEADERS = fioc.h
-noinst_PROGRAMS = fusexmp fusexmp_fh null hello hello_ll fioc fioclient \
-		  fsel fselclient cusexmp
+noinst_PROGRAMS = tmfsxmp tmfsxmp_fh null hello hello_ll fioc fioclient \
+		  fsel fselclient tmcdxmp
 
-LDADD = ../lib/libfuse.la
-fusexmp_fh_LDADD = ../lib/libfuse.la ../lib/libulockmgr.la
+LDADD = ../lib/libtmfs.la
+tmfsxmp_fh_LDADD = ../lib/libtmfs.la ../lib/libulockmgr.la
 
 fioclient_CPPFLAGS =
 fioclient_LDFLAGS =

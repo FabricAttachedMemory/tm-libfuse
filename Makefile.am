@@ -5,12 +5,12 @@ ACLOCAL_AMFLAGS = -I m4
 SUBDIRS = @subdirs2@ doc
 
 EXTRA_DIST =			\
-	fuse.pc.in		\
+	tmfs.pc.in		\
 	README*			\
 	Filesystems		\
 	FAQ
 
 pkgconfigdir = @pkgconfigdir@
-pkgconfig_DATA = fuse.pc
+pkgconfig_DATA = tmfs.pc
 
 $(pkgconfig_DATA): config.status

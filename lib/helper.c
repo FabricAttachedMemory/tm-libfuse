@@ -1,5 +1,5 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU LGPLv2.
@@ -7,11 +7,11 @@
 */
 
 #include "config.h"
-#include "fuse_i.h"
-#include "fuse_misc.h"
-#include "fuse_opt.h"
-#include "fuse_lowlevel.h"
-#include "fuse_common_compat.h"
+#include "tmfs_i.h"
+#include "tmfs_misc.h"
+#include "tmfs_opt.h"
+#include "tmfs_lowlevel.h"
+#include "tmfs_common_compat.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,26 +35,26 @@ struct helper_opts {
 	char *mountpoint;
 };
 
-#define FUSE_HELPER_OPT(t, p) { t, offsetof(struct helper_opts, p), 1 }
+#define TMFS_HELPER_OPT(t, p) { t, offsetof(struct helper_opts, p), 1 }
 
-static const struct fuse_opt fuse_helper_opts[] = {
-	FUSE_HELPER_OPT("-d",		foreground),
-	FUSE_HELPER_OPT("debug",	foreground),
-	FUSE_HELPER_OPT("-f",		foreground),
-	FUSE_HELPER_OPT("-s",		singlethread),
-	FUSE_HELPER_OPT("fsname=",	nodefault_subtype),
-	FUSE_HELPER_OPT("subtype=",	nodefault_subtype),
+static const struct tmfs_opt tmfs_helper_opts[] = {
+	TMFS_HELPER_OPT("-d",		foreground),
+	TMFS_HELPER_OPT("debug",	foreground),
+	TMFS_HELPER_OPT("-f",		foreground),
+	TMFS_HELPER_OPT("-s",		singlethread),
+	TMFS_HELPER_OPT("fsname=",	nodefault_subtype),
+	TMFS_HELPER_OPT("subtype=",	nodefault_subtype),
 
-	FUSE_OPT_KEY("-h",		KEY_HELP),
-	FUSE_OPT_KEY("--help",		KEY_HELP),
-	FUSE_OPT_KEY("-ho",		KEY_HELP_NOHEADER),
-	FUSE_OPT_KEY("-V",		KEY_VERSION),
-	FUSE_OPT_KEY("--version",	KEY_VERSION),
-	FUSE_OPT_KEY("-d",		FUSE_OPT_KEY_KEEP),
-	FUSE_OPT_KEY("debug",		FUSE_OPT_KEY_KEEP),
-	FUSE_OPT_KEY("fsname=",		FUSE_OPT_KEY_KEEP),
-	FUSE_OPT_KEY("subtype=",	FUSE_OPT_KEY_KEEP),
-	FUSE_OPT_END
+	TMFS_OPT_KEY("-h",		KEY_HELP),
+	TMFS_OPT_KEY("--help",		KEY_HELP),
+	TMFS_OPT_KEY("-ho",		KEY_HELP_NOHEADER),
+	TMFS_OPT_KEY("-V",		KEY_VERSION),
+	TMFS_OPT_KEY("--version",	KEY_VERSION),
+	TMFS_OPT_KEY("-d",		TMFS_OPT_KEY_KEEP),
+	TMFS_OPT_KEY("debug",		TMFS_OPT_KEY_KEEP),
+	TMFS_OPT_KEY("fsname=",		TMFS_OPT_KEY_KEEP),
+	TMFS_OPT_KEY("subtype=",	TMFS_OPT_KEY_KEEP),
+	TMFS_OPT_END
 };
 
 static void usage(const char *progname)
@@ -72,7 +72,7 @@ static void usage(const char *progname)
 static void helper_help(void)
 {
 	fprintf(stderr,
-		"FUSE options:\n"
+		"TMFS options:\n"
 		"    -d   -o debug          enable debug output (implies -f)\n"
 		"    -f                     foreground operation\n"
 		"    -s                     disable multi-threaded operation\n"
@@ -82,11 +82,11 @@ static void helper_help(void)
 
 static void helper_version(void)
 {
-	fprintf(stderr, "FUSE library version: %s\n", PACKAGE_VERSION);
+	fprintf(stderr, "TMFS library version: %s\n", PACKAGE_VERSION);
 }
 
-static int fuse_helper_opt_proc(void *data, const char *arg, int key,
-				struct fuse_args *outargs)
+static int tmfs_helper_opt_proc(void *data, const char *arg, int key,
+				struct tmfs_args *outargs)
 {
 	struct helper_opts *hopts = data;
 
@@ -97,24 +97,24 @@ static int fuse_helper_opt_proc(void *data, const char *arg, int key,
 
 	case KEY_HELP_NOHEADER:
 		helper_help();
-		return fuse_opt_add_arg(outargs, "-h");
+		return tmfs_opt_add_arg(outargs, "-h");
 
 	case KEY_VERSION:
 		helper_version();
 		return 1;
 
-	case FUSE_OPT_KEY_NONOPT:
+	case TMFS_OPT_KEY_NONOPT:
 		if (!hopts->mountpoint) {
 			char mountpoint[PATH_MAX];
 			if (realpath(arg, mountpoint) == NULL) {
 				fprintf(stderr,
-					"fuse: bad mount point `%s': %s\n",
+					"tmfs: bad mount point `%s': %s\n",
 					arg, strerror(errno));
 				return -1;
 			}
-			return fuse_opt_add_opt(&hopts->mountpoint, mountpoint);
+			return tmfs_opt_add_opt(&hopts->mountpoint, mountpoint);
 		} else {
-			fprintf(stderr, "fuse: invalid argument `%s'\n", arg);
+			fprintf(stderr, "tmfs: invalid argument `%s'\n", arg);
 			return -1;
 		}
 
@@ -123,7 +123,7 @@ static int fuse_helper_opt_proc(void *data, const char *arg, int key,
 	}
 }
 
-static int add_default_subtype(const char *progname, struct fuse_args *args)
+static int add_default_subtype(const char *progname, struct tmfs_args *args)
 {
 	int res;
 	char *subtype_opt;
@@ -135,24 +135,24 @@ static int add_default_subtype(const char *progname, struct fuse_args *args)
 
 	subtype_opt = (char *) malloc(strlen(basename) + 64);
 	if (subtype_opt == NULL) {
-		fprintf(stderr, "fuse: memory allocation failed\n");
+		fprintf(stderr, "tmfs: memory allocation failed\n");
 		return -1;
 	}
 	sprintf(subtype_opt, "-osubtype=%s", basename);
-	res = fuse_opt_add_arg(args, subtype_opt);
+	res = tmfs_opt_add_arg(args, subtype_opt);
 	free(subtype_opt);
 	return res;
 }
 
-int fuse_parse_cmdline(struct fuse_args *args, char **mountpoint,
+int tmfs_parse_cmdline(struct tmfs_args *args, char **mountpoint,
 		       int *multithreaded, int *foreground)
 {
 	int res;
 	struct helper_opts hopts;
 
 	memset(&hopts, 0, sizeof(hopts));
-	res = fuse_opt_parse(args, &hopts, fuse_helper_opts,
-			     fuse_helper_opt_proc);
+	res = tmfs_opt_parse(args, &hopts, tmfs_helper_opts,
+			     tmfs_helper_opt_proc);
 	if (res == -1)
 		return -1;
 
@@ -177,7 +177,7 @@ err:
 	return -1;
 }
 
-int fuse_daemonize(int foreground)
+int tmfs_daemonize(int foreground)
 {
 	if (!foreground) {
 		int nullfd;
@@ -188,7 +188,7 @@ int fuse_daemonize(int foreground)
 		 */
 		switch(fork()) {
 		case -1:
-			perror("fuse_daemonize: fork");
+			perror("tmfs_daemonize: fork");
 			return -1;
 		case 0:
 			break;
@@ -197,7 +197,7 @@ int fuse_daemonize(int foreground)
 		}
 
 		if (setsid() == -1) {
-			perror("fuse_daemonize: setsid");
+			perror("tmfs_daemonize: setsid");
 			return -1;
 		}
 
@@ -215,10 +215,10 @@ int fuse_daemonize(int foreground)
 	return 0;
 }
 
-static struct fuse_chan *fuse_mount_common(const char *mountpoint,
-					   struct fuse_args *args)
+static struct tmfs_chan *tmfs_mount_common(const char *mountpoint,
+					   struct tmfs_args *args)
 {
-	struct fuse_chan *ch;
+	struct tmfs_chan *ch;
 	int fd;
 
 	/*
@@ -231,39 +231,39 @@ static struct fuse_chan *fuse_mount_common(const char *mountpoint,
 			close(fd);
 	} while (fd >= 0 && fd <= 2);
 
-	fd = fuse_mount_compat25(mountpoint, args);
+	fd = tmfs_mount_compat25(mountpoint, args);
 	if (fd == -1)
 		return NULL;
 
-	ch = fuse_kern_chan_new(fd);
+	ch = tmfs_kern_chan_new(fd);
 	if (!ch)
-		fuse_kern_unmount(mountpoint, fd);
+		tmfs_kern_unmount(mountpoint, fd);
 
 	return ch;
 }
 
-struct fuse_chan *fuse_mount(const char *mountpoint, struct fuse_args *args)
+struct tmfs_chan *tmfs_mount(const char *mountpoint, struct tmfs_args *args)
 {
-	return fuse_mount_common(mountpoint, args);
+	return tmfs_mount_common(mountpoint, args);
 }
 
-static void fuse_unmount_common(const char *mountpoint, struct fuse_chan *ch)
+static void tmfs_unmount_common(const char *mountpoint, struct tmfs_chan *ch)
 {
 	if (mountpoint) {
-		int fd = ch ? fuse_chan_clearfd(ch) : -1;
-		fuse_kern_unmount(mountpoint, fd);
+		int fd = ch ? tmfs_chan_clearfd(ch) : -1;
+		tmfs_kern_unmount(mountpoint, fd);
 		if (ch)
-			fuse_chan_destroy(ch);
+			tmfs_chan_destroy(ch);
 	}
 }
 
-void fuse_unmount(const char *mountpoint, struct fuse_chan *ch)
+void tmfs_unmount(const char *mountpoint, struct tmfs_chan *ch)
 {
-	fuse_unmount_common(mountpoint, ch);
+	tmfs_unmount_common(mountpoint, ch);
 }
 
-struct fuse *fuse_setup_common(int argc, char *argv[],
-			       const struct fuse_operations *op,
+struct tmfs *tmfs_setup_common(int argc, char *argv[],
+			       const struct tmfs_operations *op,
 			       size_t op_size,
 			       char **mountpoint,
 			       int *multithreaded,
@@ -271,210 +271,210 @@ struct fuse *fuse_setup_common(int argc, char *argv[],
 			       void *user_data,
 			       int compat)
 {
-	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
-	struct fuse_chan *ch;
-	struct fuse *fuse;
+	struct tmfs_args args = TMFS_ARGS_INIT(argc, argv);
+	struct tmfs_chan *ch;
+	struct tmfs *tmfs;
 	int foreground;
 	int res;
 
-	res = fuse_parse_cmdline(&args, mountpoint, multithreaded, &foreground);
+	res = tmfs_parse_cmdline(&args, mountpoint, multithreaded, &foreground);
 	if (res == -1)
 		return NULL;
 
-	ch = fuse_mount_common(*mountpoint, &args);
+	ch = tmfs_mount_common(*mountpoint, &args);
 	if (!ch) {
-		fuse_opt_free_args(&args);
+		tmfs_opt_free_args(&args);
 		goto err_free;
 	}
 
-	fuse = fuse_new_common(ch, &args, op, op_size, user_data, compat);
-	fuse_opt_free_args(&args);
-	if (fuse == NULL)
+	tmfs = tmfs_new_common(ch, &args, op, op_size, user_data, compat);
+	tmfs_opt_free_args(&args);
+	if (tmfs == NULL)
 		goto err_unmount;
 
-	res = fuse_daemonize(foreground);
+	res = tmfs_daemonize(foreground);
 	if (res == -1)
 		goto err_unmount;
 
-	res = fuse_set_signal_handlers(fuse_get_session(fuse));
+	res = tmfs_set_signal_handlers(tmfs_get_session(tmfs));
 	if (res == -1)
 		goto err_unmount;
 
 	if (fd)
-		*fd = fuse_chan_fd(ch);
+		*fd = tmfs_chan_fd(ch);
 
-	return fuse;
+	return tmfs;
 
 err_unmount:
-	fuse_unmount_common(*mountpoint, ch);
-	if (fuse)
-		fuse_destroy(fuse);
+	tmfs_unmount_common(*mountpoint, ch);
+	if (tmfs)
+		tmfs_destroy(tmfs);
 err_free:
 	free(*mountpoint);
 	return NULL;
 }
 
-struct fuse *fuse_setup(int argc, char *argv[],
-			const struct fuse_operations *op, size_t op_size,
+struct tmfs *tmfs_setup(int argc, char *argv[],
+			const struct tmfs_operations *op, size_t op_size,
 			char **mountpoint, int *multithreaded, void *user_data)
 {
-	return fuse_setup_common(argc, argv, op, op_size, mountpoint,
+	return tmfs_setup_common(argc, argv, op, op_size, mountpoint,
 				 multithreaded, NULL, user_data, 0);
 }
 
-static void fuse_teardown_common(struct fuse *fuse, char *mountpoint)
+static void tmfs_teardown_common(struct tmfs *tmfs, char *mountpoint)
 {
-	struct fuse_session *se = fuse_get_session(fuse);
-	struct fuse_chan *ch = fuse_session_next_chan(se, NULL);
-	fuse_remove_signal_handlers(se);
-	fuse_unmount_common(mountpoint, ch);
-	fuse_destroy(fuse);
+	struct tmfs_session *se = tmfs_get_session(tmfs);
+	struct tmfs_chan *ch = tmfs_session_next_chan(se, NULL);
+	tmfs_remove_signal_handlers(se);
+	tmfs_unmount_common(mountpoint, ch);
+	tmfs_destroy(tmfs);
 	free(mountpoint);
 }
 
-void fuse_teardown(struct fuse *fuse, char *mountpoint)
+void tmfs_teardown(struct tmfs *tmfs, char *mountpoint)
 {
-	fuse_teardown_common(fuse, mountpoint);
+	tmfs_teardown_common(tmfs, mountpoint);
 }
 
-static int fuse_main_common(int argc, char *argv[],
-			    const struct fuse_operations *op, size_t op_size,
+static int tmfs_main_common(int argc, char *argv[],
+			    const struct tmfs_operations *op, size_t op_size,
 			    void *user_data, int compat)
 {
-	struct fuse *fuse;
+	struct tmfs *tmfs;
 	char *mountpoint;
 	int multithreaded;
 	int res;
 
-	fuse = fuse_setup_common(argc, argv, op, op_size, &mountpoint,
+	tmfs = tmfs_setup_common(argc, argv, op, op_size, &mountpoint,
 				 &multithreaded, NULL, user_data, compat);
-	if (fuse == NULL)
+	if (tmfs == NULL)
 		return 1;
 
 	if (multithreaded)
-		res = fuse_loop_mt(fuse);
+		res = tmfs_loop_mt(tmfs);
 	else
-		res = fuse_loop(fuse);
+		res = tmfs_loop(tmfs);
 
-	fuse_teardown_common(fuse, mountpoint);
+	tmfs_teardown_common(tmfs, mountpoint);
 	if (res == -1)
 		return 1;
 
 	return 0;
 }
 
-int fuse_main_real(int argc, char *argv[], const struct fuse_operations *op,
+int tmfs_main_real(int argc, char *argv[], const struct tmfs_operations *op,
 		   size_t op_size, void *user_data)
 {
-	return fuse_main_common(argc, argv, op, op_size, user_data, 0);
+	return tmfs_main_common(argc, argv, op, op_size, user_data, 0);
 }
 
-#undef fuse_main
-int fuse_main(void);
-int fuse_main(void)
+#undef tmfs_main
+int tmfs_main(void);
+int tmfs_main(void)
 {
-	fprintf(stderr, "fuse_main(): This function does not exist\n");
+	fprintf(stderr, "tmfs_main(): This function does not exist\n");
 	return -1;
 }
 
-int fuse_version(void)
+int tmfs_version(void)
 {
-	return FUSE_VERSION;
+	return TMFS_VERSION;
 }
 
-#include "fuse_compat.h"
+#include "tmfs_compat.h"
 
 #if !defined(__FreeBSD__) && !defined(__NetBSD__)
 
-struct fuse *fuse_setup_compat22(int argc, char *argv[],
-				 const struct fuse_operations_compat22 *op,
+struct tmfs *tmfs_setup_compat22(int argc, char *argv[],
+				 const struct tmfs_operations_compat22 *op,
 				 size_t op_size, char **mountpoint,
 				 int *multithreaded, int *fd)
 {
-	return fuse_setup_common(argc, argv, (struct fuse_operations *) op,
+	return tmfs_setup_common(argc, argv, (struct tmfs_operations *) op,
 				 op_size, mountpoint, multithreaded, fd, NULL,
 				 22);
 }
 
-struct fuse *fuse_setup_compat2(int argc, char *argv[],
-				const struct fuse_operations_compat2 *op,
+struct tmfs *tmfs_setup_compat2(int argc, char *argv[],
+				const struct tmfs_operations_compat2 *op,
 				char **mountpoint, int *multithreaded,
 				int *fd)
 {
-	return fuse_setup_common(argc, argv, (struct fuse_operations *) op,
-				 sizeof(struct fuse_operations_compat2),
+	return tmfs_setup_common(argc, argv, (struct tmfs_operations *) op,
+				 sizeof(struct tmfs_operations_compat2),
 				 mountpoint, multithreaded, fd, NULL, 21);
 }
 
-int fuse_main_real_compat22(int argc, char *argv[],
-			    const struct fuse_operations_compat22 *op,
+int tmfs_main_real_compat22(int argc, char *argv[],
+			    const struct tmfs_operations_compat22 *op,
 			    size_t op_size)
 {
-	return fuse_main_common(argc, argv, (struct fuse_operations *) op,
+	return tmfs_main_common(argc, argv, (struct tmfs_operations *) op,
 				op_size, NULL, 22);
 }
 
-void fuse_main_compat1(int argc, char *argv[],
-		       const struct fuse_operations_compat1 *op)
+void tmfs_main_compat1(int argc, char *argv[],
+		       const struct tmfs_operations_compat1 *op)
 {
-	fuse_main_common(argc, argv, (struct fuse_operations *) op,
-			 sizeof(struct fuse_operations_compat1), NULL, 11);
+	tmfs_main_common(argc, argv, (struct tmfs_operations *) op,
+			 sizeof(struct tmfs_operations_compat1), NULL, 11);
 }
 
-int fuse_main_compat2(int argc, char *argv[],
-		      const struct fuse_operations_compat2 *op)
+int tmfs_main_compat2(int argc, char *argv[],
+		      const struct tmfs_operations_compat2 *op)
 {
-	return fuse_main_common(argc, argv, (struct fuse_operations *) op,
-				sizeof(struct fuse_operations_compat2), NULL,
+	return tmfs_main_common(argc, argv, (struct tmfs_operations *) op,
+				sizeof(struct tmfs_operations_compat2), NULL,
 				21);
 }
 
-int fuse_mount_compat1(const char *mountpoint, const char *args[])
+int tmfs_mount_compat1(const char *mountpoint, const char *args[])
 {
 	/* just ignore mount args for now */
 	(void) args;
-	return fuse_mount_compat22(mountpoint, NULL);
+	return tmfs_mount_compat22(mountpoint, NULL);
 }
 
-FUSE_SYMVER(".symver fuse_setup_compat2,__fuse_setup@");
-FUSE_SYMVER(".symver fuse_setup_compat22,fuse_setup@FUSE_2.2");
-FUSE_SYMVER(".symver fuse_teardown,__fuse_teardown@");
-FUSE_SYMVER(".symver fuse_main_compat2,fuse_main@");
-FUSE_SYMVER(".symver fuse_main_real_compat22,fuse_main_real@FUSE_2.2");
+TMFS_SYMVER(".symver tmfs_setup_compat2,__tmfs_setup@");
+TMFS_SYMVER(".symver tmfs_setup_compat22,tmfs_setup@TMFS_2.2");
+TMFS_SYMVER(".symver tmfs_teardown,__tmfs_teardown@");
+TMFS_SYMVER(".symver tmfs_main_compat2,tmfs_main@");
+TMFS_SYMVER(".symver tmfs_main_real_compat22,tmfs_main_real@TMFS_2.2");
 
 #endif /* __FreeBSD__ || __NetBSD__ */
 
 
-struct fuse *fuse_setup_compat25(int argc, char *argv[],
-				 const struct fuse_operations_compat25 *op,
+struct tmfs *tmfs_setup_compat25(int argc, char *argv[],
+				 const struct tmfs_operations_compat25 *op,
 				 size_t op_size, char **mountpoint,
 				 int *multithreaded, int *fd)
 {
-	return fuse_setup_common(argc, argv, (struct fuse_operations *) op,
+	return tmfs_setup_common(argc, argv, (struct tmfs_operations *) op,
 				 op_size, mountpoint, multithreaded, fd, NULL,
 				 25);
 }
 
-int fuse_main_real_compat25(int argc, char *argv[],
-			    const struct fuse_operations_compat25 *op,
+int tmfs_main_real_compat25(int argc, char *argv[],
+			    const struct tmfs_operations_compat25 *op,
 			    size_t op_size)
 {
-	return fuse_main_common(argc, argv, (struct fuse_operations *) op,
+	return tmfs_main_common(argc, argv, (struct tmfs_operations *) op,
 				op_size, NULL, 25);
 }
 
-void fuse_teardown_compat22(struct fuse *fuse, int fd, char *mountpoint)
+void tmfs_teardown_compat22(struct tmfs *tmfs, int fd, char *mountpoint)
 {
 	(void) fd;
-	fuse_teardown_common(fuse, mountpoint);
+	tmfs_teardown_common(tmfs, mountpoint);
 }
 
-int fuse_mount_compat25(const char *mountpoint, struct fuse_args *args)
+int tmfs_mount_compat25(const char *mountpoint, struct tmfs_args *args)
 {
-	return fuse_kern_mount(mountpoint, args);
+	return tmfs_kern_mount(mountpoint, args);
 }
 
-FUSE_SYMVER(".symver fuse_setup_compat25,fuse_setup@FUSE_2.5");
-FUSE_SYMVER(".symver fuse_teardown_compat22,fuse_teardown@FUSE_2.2");
-FUSE_SYMVER(".symver fuse_main_real_compat25,fuse_main_real@FUSE_2.5");
-FUSE_SYMVER(".symver fuse_mount_compat25,fuse_mount@FUSE_2.5");
+TMFS_SYMVER(".symver tmfs_setup_compat25,tmfs_setup@TMFS_2.5");
+TMFS_SYMVER(".symver tmfs_teardown_compat22,tmfs_teardown@TMFS_2.2");
+TMFS_SYMVER(".symver tmfs_main_real_compat25,tmfs_main_real@TMFS_2.5");
+TMFS_SYMVER(".symver tmfs_mount_compat25,tmfs_mount@TMFS_2.5");

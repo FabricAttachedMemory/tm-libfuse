@@ -1,5 +1,5 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU LGPLv2.
@@ -8,25 +8,25 @@
 
 /** @file */
 
-#if !defined(_FUSE_H_) && !defined(_FUSE_LOWLEVEL_H_)
-#error "Never include <fuse_common.h> directly; use <fuse.h> or <fuse_lowlevel.h> instead."
+#if !defined(_TMFS_H_) && !defined(_TMFS_LOWLEVEL_H_)
+#error "Never include <tmfs_common.h> directly; use <tmfs.h> or <tmfs_lowlevel.h> instead."
 #endif
 
-#ifndef _FUSE_COMMON_H_
-#define _FUSE_COMMON_H_
+#ifndef _TMFS_COMMON_H_
+#define _TMFS_COMMON_H_
 
-#include "fuse_opt.h"
+#include "tmfs_opt.h"
 #include <stdint.h>
 #include <sys/types.h>
 
-/** Major version of FUSE library interface */
-#define FUSE_MAJOR_VERSION 2
+/** Major version of TMFS library interface */
+#define TMFS_MAJOR_VERSION 2
 
-/** Minor version of FUSE library interface */
-#define FUSE_MINOR_VERSION 9
+/** Minor version of TMFS library interface */
+#define TMFS_MINOR_VERSION 9
 
-#define FUSE_MAKE_VERSION(maj, min)  ((maj) * 10 + (min))
-#define FUSE_VERSION FUSE_MAKE_VERSION(FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION)
+#define TMFS_MAKE_VERSION(maj, min)  ((maj) * 10 + (min))
+#define TMFS_VERSION TMFS_MAKE_VERSION(TMFS_MAJOR_VERSION, TMFS_MINOR_VERSION)
 
 /* This interface uses 64 bit off_t */
 #if _FILE_OFFSET_BITS != 64
@@ -42,7 +42,7 @@ extern "C" {
  *
  * Changed in version 2.5
  */
-struct fuse_file_info {
+struct tmfs_file_info {
 	/** Open flags.	 Available in open() and release() */
 	int flags;
 
@@ -88,47 +88,47 @@ struct fuse_file_info {
 };
 
 /**
- * Capability bits for 'fuse_conn_info.capable' and 'fuse_conn_info.want'
+ * Capability bits for 'tmfs_conn_info.capable' and 'tmfs_conn_info.want'
  *
- * FUSE_CAP_ASYNC_READ: filesystem supports asynchronous read requests
- * FUSE_CAP_POSIX_LOCKS: filesystem supports "remote" locking
- * FUSE_CAP_ATOMIC_O_TRUNC: filesystem handles the O_TRUNC open flag
- * FUSE_CAP_EXPORT_SUPPORT: filesystem handles lookups of "." and ".."
- * FUSE_CAP_BIG_WRITES: filesystem can handle write size larger than 4kB
- * FUSE_CAP_DONT_MASK: don't apply umask to file mode on create operations
- * FUSE_CAP_SPLICE_WRITE: ability to use splice() to write to the fuse device
- * FUSE_CAP_SPLICE_MOVE: ability to move data to the fuse device with splice()
- * FUSE_CAP_SPLICE_READ: ability to use splice() to read from the fuse device
- * FUSE_CAP_IOCTL_DIR: ioctl support on directories
+ * TMFS_CAP_ASYNC_READ: filesystem supports asynchronous read requests
+ * TMFS_CAP_POSIX_LOCKS: filesystem supports "remote" locking
+ * TMFS_CAP_ATOMIC_O_TRUNC: filesystem handles the O_TRUNC open flag
+ * TMFS_CAP_EXPORT_SUPPORT: filesystem handles lookups of "." and ".."
+ * TMFS_CAP_BIG_WRITES: filesystem can handle write size larger than 4kB
+ * TMFS_CAP_DONT_MASK: don't apply umask to file mode on create operations
+ * TMFS_CAP_SPLICE_WRITE: ability to use splice() to write to the tmfs device
+ * TMFS_CAP_SPLICE_MOVE: ability to move data to the tmfs device with splice()
+ * TMFS_CAP_SPLICE_READ: ability to use splice() to read from the tmfs device
+ * TMFS_CAP_IOCTL_DIR: ioctl support on directories
  */
-#define FUSE_CAP_ASYNC_READ	(1 << 0)
-#define FUSE_CAP_POSIX_LOCKS	(1 << 1)
-#define FUSE_CAP_ATOMIC_O_TRUNC	(1 << 3)
-#define FUSE_CAP_EXPORT_SUPPORT	(1 << 4)
-#define FUSE_CAP_BIG_WRITES	(1 << 5)
-#define FUSE_CAP_DONT_MASK	(1 << 6)
-#define FUSE_CAP_SPLICE_WRITE	(1 << 7)
-#define FUSE_CAP_SPLICE_MOVE	(1 << 8)
-#define FUSE_CAP_SPLICE_READ	(1 << 9)
-#define FUSE_CAP_FLOCK_LOCKS	(1 << 10)
-#define FUSE_CAP_IOCTL_DIR	(1 << 11)
+#define TMFS_CAP_ASYNC_READ	(1 << 0)
+#define TMFS_CAP_POSIX_LOCKS	(1 << 1)
+#define TMFS_CAP_ATOMIC_O_TRUNC	(1 << 3)
+#define TMFS_CAP_EXPORT_SUPPORT	(1 << 4)
+#define TMFS_CAP_BIG_WRITES	(1 << 5)
+#define TMFS_CAP_DONT_MASK	(1 << 6)
+#define TMFS_CAP_SPLICE_WRITE	(1 << 7)
+#define TMFS_CAP_SPLICE_MOVE	(1 << 8)
+#define TMFS_CAP_SPLICE_READ	(1 << 9)
+#define TMFS_CAP_FLOCK_LOCKS	(1 << 10)
+#define TMFS_CAP_IOCTL_DIR	(1 << 11)
 
 /**
  * Ioctl flags
  *
- * FUSE_IOCTL_COMPAT: 32bit compat ioctl on 64bit machine
- * FUSE_IOCTL_UNRESTRICTED: not restricted to well-formed ioctls, retry allowed
- * FUSE_IOCTL_RETRY: retry with new iovecs
- * FUSE_IOCTL_DIR: is a directory
+ * TMFS_IOCTL_COMPAT: 32bit compat ioctl on 64bit machine
+ * TMFS_IOCTL_UNRESTRICTED: not restricted to well-formed ioctls, retry allowed
+ * TMFS_IOCTL_RETRY: retry with new iovecs
+ * TMFS_IOCTL_DIR: is a directory
  *
- * FUSE_IOCTL_MAX_IOV: maximum of in_iovecs + out_iovecs
+ * TMFS_IOCTL_MAX_IOV: maximum of in_iovecs + out_iovecs
  */
-#define FUSE_IOCTL_COMPAT	(1 << 0)
-#define FUSE_IOCTL_UNRESTRICTED	(1 << 1)
-#define FUSE_IOCTL_RETRY	(1 << 2)
-#define FUSE_IOCTL_DIR		(1 << 4)
+#define TMFS_IOCTL_COMPAT	(1 << 0)
+#define TMFS_IOCTL_UNRESTRICTED	(1 << 1)
+#define TMFS_IOCTL_RETRY	(1 << 2)
+#define TMFS_IOCTL_DIR		(1 << 4)
 
-#define FUSE_IOCTL_MAX_IOV	256
+#define TMFS_IOCTL_MAX_IOV	256
 
 /**
  * Connection information, passed to the ->init() method
@@ -137,7 +137,7 @@ struct fuse_file_info {
  * indicate the value requested by the filesystem.  The requested
  * value must usually be smaller than the indicated value.
  */
-struct fuse_conn_info {
+struct tmfs_conn_info {
 	/**
 	 * Major version of the protocol (read-only)
 	 */
@@ -189,29 +189,29 @@ struct fuse_conn_info {
 	unsigned reserved[23];
 };
 
-struct fuse_session;
-struct fuse_chan;
-struct fuse_pollhandle;
+struct tmfs_session;
+struct tmfs_chan;
+struct tmfs_pollhandle;
 
 /**
- * Create a FUSE mountpoint
+ * Create a TMFS mountpoint
  *
  * Returns a control file descriptor suitable for passing to
- * fuse_new()
+ * tmfs_new()
  *
  * @param mountpoint the mount point path
  * @param args argument vector
  * @return the communication channel on success, NULL on failure
  */
-struct fuse_chan *fuse_mount(const char *mountpoint, struct fuse_args *args);
+struct tmfs_chan *tmfs_mount(const char *mountpoint, struct tmfs_args *args);
 
 /**
- * Umount a FUSE mountpoint
+ * Umount a TMFS mountpoint
  *
  * @param mountpoint the mount point path
  * @param ch the communication channel
  */
-void fuse_unmount(const char *mountpoint, struct fuse_chan *ch);
+void tmfs_unmount(const char *mountpoint, struct tmfs_chan *ch);
 
 /**
  * Parse common options
@@ -234,7 +234,7 @@ void fuse_unmount(const char *mountpoint, struct fuse_chan *ch);
  * @param foreground set to 1 if one of the relevant options is present
  * @return 0 on success, -1 on failure
  */
-int fuse_parse_cmdline(struct fuse_args *args, char **mountpoint,
+int tmfs_parse_cmdline(struct tmfs_args *args, char **mountpoint,
 		       int *multithreaded, int *foreground);
 
 /**
@@ -243,21 +243,21 @@ int fuse_parse_cmdline(struct fuse_args *args, char **mountpoint,
  * @param foreground if true, stay in the foreground
  * @return 0 on success, -1 on failure
  */
-int fuse_daemonize(int foreground);
+int tmfs_daemonize(int foreground);
 
 /**
  * Get the version of the library
  *
  * @return the version
  */
-int fuse_version(void);
+int tmfs_version(void);
 
 /**
  * Destroy poll handle
  *
  * @param ph the poll handle
  */
-void fuse_pollhandle_destroy(struct fuse_pollhandle *ph);
+void tmfs_pollhandle_destroy(struct tmfs_pollhandle *ph);
 
 /* ----------------------------------------------------------- *
  * Data buffer						       *
@@ -266,14 +266,14 @@ void fuse_pollhandle_destroy(struct fuse_pollhandle *ph);
 /**
  * Buffer flags
  */
-enum fuse_buf_flags {
+enum tmfs_buf_flags {
 	/**
 	 * Buffer contains a file descriptor
 	 *
 	 * If this flag is set, the .fd field is valid, otherwise the
 	 * .mem fields is valid.
 	 */
-	FUSE_BUF_IS_FD		= (1 << 1),
+	TMFS_BUF_IS_FD		= (1 << 1),
 
 	/**
 	 * Seek on the file descriptor
@@ -282,7 +282,7 @@ enum fuse_buf_flags {
 	 * used to seek to the given offset before performing
 	 * operation on file descriptor.
 	 */
-	FUSE_BUF_FD_SEEK	= (1 << 2),
+	TMFS_BUF_FD_SEEK	= (1 << 2),
 
 	/**
 	 * Retry operation on file descriptor
@@ -291,13 +291,13 @@ enum fuse_buf_flags {
 	 * until .size bytes have been copied or an error or EOF is
 	 * detected.
 	 */
-	FUSE_BUF_FD_RETRY	= (1 << 3),
+	TMFS_BUF_FD_RETRY	= (1 << 3),
 };
 
 /**
  * Buffer copy flags
  */
-enum fuse_buf_copy_flags {
+enum tmfs_buf_copy_flags {
 	/**
 	 * Don't use splice(2)
 	 *
@@ -307,7 +307,7 @@ enum fuse_buf_copy_flags {
 	 * If this flag is not set, then only fall back if splice is
 	 * unavailable.
 	 */
-	FUSE_BUF_NO_SPLICE	= (1 << 1),
+	TMFS_BUF_NO_SPLICE	= (1 << 1),
 
 	/**
 	 * Force splice
@@ -315,7 +315,7 @@ enum fuse_buf_copy_flags {
 	 * Always use splice(2) to copy data from one file descriptor
 	 * to another.  If splice is not available, return -EINVAL.
 	 */
-	FUSE_BUF_FORCE_SPLICE	= (1 << 2),
+	TMFS_BUF_FORCE_SPLICE	= (1 << 2),
 
 	/**
 	 * Try to move data with splice.
@@ -324,7 +324,7 @@ enum fuse_buf_copy_flags {
 	 * destination instead of copying.  See documentation of
 	 * SPLICE_F_MOVE in splice(2) man page.
 	 */
-	FUSE_BUF_SPLICE_MOVE	= (1 << 3),
+	TMFS_BUF_SPLICE_MOVE	= (1 << 3),
 
 	/**
 	 * Don't block on the pipe when copying data with splice
@@ -333,7 +333,7 @@ enum fuse_buf_copy_flags {
 	 * is full or empty).  See SPLICE_F_NONBLOCK in the splice(2)
 	 * man page.
 	 */
-	FUSE_BUF_SPLICE_NONBLOCK= (1 << 4),
+	TMFS_BUF_SPLICE_NONBLOCK= (1 << 4),
 };
 
 /**
@@ -342,7 +342,7 @@ enum fuse_buf_copy_flags {
  * Generic data buffer for I/O, extended attributes, etc...  Data may
  * be supplied as a memory pointer or as a file descriptor
  */
-struct fuse_buf {
+struct tmfs_buf {
 	/**
 	 * Size of data in bytes
 	 */
@@ -351,26 +351,26 @@ struct fuse_buf {
 	/**
 	 * Buffer flags
 	 */
-	enum fuse_buf_flags flags;
+	enum tmfs_buf_flags flags;
 
 	/**
 	 * Memory pointer
 	 *
-	 * Used unless FUSE_BUF_IS_FD flag is set.
+	 * Used unless TMFS_BUF_IS_FD flag is set.
 	 */
 	void *mem;
 
 	/**
 	 * File descriptor
 	 *
-	 * Used if FUSE_BUF_IS_FD flag is set.
+	 * Used if TMFS_BUF_IS_FD flag is set.
 	 */
 	int fd;
 
 	/**
 	 * File position
 	 *
-	 * Used if FUSE_BUF_FD_SEEK flag is set.
+	 * Used if TMFS_BUF_FD_SEEK flag is set.
 	 */
 	off_t pos;
 };
@@ -383,7 +383,7 @@ struct fuse_buf {
  *
  * Allocate dynamically to add more than one buffer.
  */
-struct fuse_bufvec {
+struct tmfs_bufvec {
 	/**
 	 * Number of buffers in the array
 	 */
@@ -402,18 +402,18 @@ struct fuse_bufvec {
 	/**
 	 * Array of buffers
 	 */
-	struct fuse_buf buf[1];
+	struct tmfs_buf buf[1];
 };
 
 /* Initialize bufvec with a single buffer of given size */
-#define FUSE_BUFVEC_INIT(size__) 				\
-	((struct fuse_bufvec) {					\
+#define TMFS_BUFVEC_INIT(size__) 				\
+	((struct tmfs_bufvec) {					\
 		/* .count= */ 1,				\
 		/* .idx =  */ 0,				\
 		/* .off =  */ 0,				\
 		/* .buf =  */ { /* [0] = */ {			\
 			/* .size =  */ (size__),		\
-			/* .flags = */ (enum fuse_buf_flags) 0,	\
+			/* .flags = */ (enum tmfs_buf_flags) 0,	\
 			/* .mem =   */ NULL,			\
 			/* .fd =    */ -1,			\
 			/* .pos =   */ 0,			\
@@ -421,12 +421,12 @@ struct fuse_bufvec {
 	} )
 
 /**
- * Get total size of data in a fuse buffer vector
+ * Get total size of data in a tmfs buffer vector
  *
  * @param bufv buffer vector
  * @return size of data
  */
-size_t fuse_buf_size(const struct fuse_bufvec *bufv);
+size_t tmfs_buf_size(const struct tmfs_bufvec *bufv);
 
 /**
  * Copy data from one buffer vector to another
@@ -436,8 +436,8 @@ size_t fuse_buf_size(const struct fuse_bufvec *bufv);
  * @param flags flags controlling the copy
  * @return actual number of bytes copied or -errno on error
  */
-ssize_t fuse_buf_copy(struct fuse_bufvec *dst, struct fuse_bufvec *src,
-		      enum fuse_buf_copy_flags flags);
+ssize_t tmfs_buf_copy(struct tmfs_bufvec *dst, struct tmfs_bufvec *src,
+		      enum tmfs_buf_copy_flags flags);
 
 /* ----------------------------------------------------------- *
  * Signal handling					       *
@@ -447,52 +447,52 @@ ssize_t fuse_buf_copy(struct fuse_bufvec *dst, struct fuse_bufvec *src,
  * Exit session on HUP, TERM and INT signals and ignore PIPE signal
  *
  * Stores session in a global variable.	 May only be called once per
- * process until fuse_remove_signal_handlers() is called.
+ * process until tmfs_remove_signal_handlers() is called.
  *
  * @param se the session to exit
  * @return 0 on success, -1 on failure
  */
-int fuse_set_signal_handlers(struct fuse_session *se);
+int tmfs_set_signal_handlers(struct tmfs_session *se);
 
 /**
  * Restore default signal handlers
  *
- * Resets global session.  After this fuse_set_signal_handlers() may
+ * Resets global session.  After this tmfs_set_signal_handlers() may
  * be called again.
  *
- * @param se the same session as given in fuse_set_signal_handlers()
+ * @param se the same session as given in tmfs_set_signal_handlers()
  */
-void fuse_remove_signal_handlers(struct fuse_session *se);
+void tmfs_remove_signal_handlers(struct tmfs_session *se);
 
 /* ----------------------------------------------------------- *
  * Compatibility stuff					       *
  * ----------------------------------------------------------- */
 
-#if FUSE_USE_VERSION < 26
+#if TMFS_USE_VERSION < 26
 #    ifdef __FreeBSD__
-#	 if FUSE_USE_VERSION < 25
+#	 if TMFS_USE_VERSION < 25
 #	     error On FreeBSD API version 25 or greater must be used
 #	 endif
 #    endif
-#    include "fuse_common_compat.h"
-#    undef FUSE_MINOR_VERSION
-#    undef fuse_main
-#    define fuse_unmount fuse_unmount_compat22
-#    if FUSE_USE_VERSION == 25
-#	 define FUSE_MINOR_VERSION 5
-#	 define fuse_mount fuse_mount_compat25
-#    elif FUSE_USE_VERSION == 24 || FUSE_USE_VERSION == 22
-#	 define FUSE_MINOR_VERSION 4
-#	 define fuse_mount fuse_mount_compat22
-#    elif FUSE_USE_VERSION == 21
-#	 define FUSE_MINOR_VERSION 1
-#	 define fuse_mount fuse_mount_compat22
-#    elif FUSE_USE_VERSION == 11
+#    include "tmfs_common_compat.h"
+#    undef TMFS_MINOR_VERSION
+#    undef tmfs_main
+#    define tmfs_unmount tmfs_unmount_compat22
+#    if TMFS_USE_VERSION == 25
+#	 define TMFS_MINOR_VERSION 5
+#	 define tmfs_mount tmfs_mount_compat25
+#    elif TMFS_USE_VERSION == 24 || TMFS_USE_VERSION == 22
+#	 define TMFS_MINOR_VERSION 4
+#	 define tmfs_mount tmfs_mount_compat22
+#    elif TMFS_USE_VERSION == 21
+#	 define TMFS_MINOR_VERSION 1
+#	 define tmfs_mount tmfs_mount_compat22
+#    elif TMFS_USE_VERSION == 11
 #	 warning Compatibility with API version 11 is deprecated
-#	 undef FUSE_MAJOR_VERSION
-#	 define FUSE_MAJOR_VERSION 1
-#	 define FUSE_MINOR_VERSION 1
-#	 define fuse_mount fuse_mount_compat1
+#	 undef TMFS_MAJOR_VERSION
+#	 define TMFS_MAJOR_VERSION 1
+#	 define TMFS_MINOR_VERSION 1
+#	 define tmfs_mount tmfs_mount_compat1
 #    else
 #	 error Compatibility with API version other than 21, 22, 24, 25 and 11 not supported
 #    endif
@@ -502,4 +502,4 @@ void fuse_remove_signal_handlers(struct fuse_session *se);
 }
 #endif
 
-#endif /* _FUSE_COMMON_H_ */
+#endif /* _TMFS_COMMON_H_ */

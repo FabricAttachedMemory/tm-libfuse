@@ -1,32 +1,32 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU LGPLv2.
   See the file COPYING.LIB
 */
 
-#include "fuse_opt.h"
-#include "fuse_misc.h"
+#include "tmfs_opt.h"
+#include "tmfs_misc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
-struct fuse_opt_context {
+struct tmfs_opt_context {
 	void *data;
-	const struct fuse_opt *opt;
-	fuse_opt_proc_t proc;
+	const struct tmfs_opt *opt;
+	tmfs_opt_proc_t proc;
 	int argctr;
 	int argc;
 	char **argv;
-	struct fuse_args outargs;
+	struct tmfs_args outargs;
 	char *opts;
 	int nonopt;
 };
 
-void fuse_opt_free_args(struct fuse_args *args)
+void tmfs_opt_free_args(struct tmfs_args *args)
 {
 	if (args) {
 		if (args->argv && args->allocated) {
@@ -43,11 +43,11 @@ void fuse_opt_free_args(struct fuse_args *args)
 
 static int alloc_failed(void)
 {
-	fprintf(stderr, "fuse: memory allocation failed\n");
+	fprintf(stderr, "tmfs: memory allocation failed\n");
 	return -1;
 }
 
-int fuse_opt_add_arg(struct fuse_args *args, const char *arg)
+int tmfs_opt_add_arg(struct tmfs_args *args, const char *arg)
 {
 	char **newargv;
 	char *newarg;
@@ -71,11 +71,11 @@ int fuse_opt_add_arg(struct fuse_args *args, const char *arg)
 	return 0;
 }
 
-static int fuse_opt_insert_arg_common(struct fuse_args *args, int pos,
+static int tmfs_opt_insert_arg_common(struct tmfs_args *args, int pos,
 				      const char *arg)
 {
 	assert(pos <= args->argc);
-	if (fuse_opt_add_arg(args, arg) == -1)
+	if (tmfs_opt_add_arg(args, arg) == -1)
 		return -1;
 
 	if (pos != args->argc - 1) {
@@ -87,31 +87,31 @@ static int fuse_opt_insert_arg_common(struct fuse_args *args, int pos,
 	return 0;
 }
 
-int fuse_opt_insert_arg(struct fuse_args *args, int pos, const char *arg)
+int tmfs_opt_insert_arg(struct tmfs_args *args, int pos, const char *arg)
 {
-	return fuse_opt_insert_arg_common(args, pos, arg);
+	return tmfs_opt_insert_arg_common(args, pos, arg);
 }
 
-int fuse_opt_insert_arg_compat(struct fuse_args *args, int pos,
+int tmfs_opt_insert_arg_compat(struct tmfs_args *args, int pos,
 			       const char *arg);
-int fuse_opt_insert_arg_compat(struct fuse_args *args, int pos, const char *arg)
+int tmfs_opt_insert_arg_compat(struct tmfs_args *args, int pos, const char *arg)
 {
-	return fuse_opt_insert_arg_common(args, pos, arg);
+	return tmfs_opt_insert_arg_common(args, pos, arg);
 }
 
-static int next_arg(struct fuse_opt_context *ctx, const char *opt)
+static int next_arg(struct tmfs_opt_context *ctx, const char *opt)
 {
 	if (ctx->argctr + 1 >= ctx->argc) {
-		fprintf(stderr, "fuse: missing argument after `%s'\n", opt);
+		fprintf(stderr, "tmfs: missing argument after `%s'\n", opt);
 		return -1;
 	}
 	ctx->argctr++;
 	return 0;
 }
 
-static int add_arg(struct fuse_opt_context *ctx, const char *arg)
+static int add_arg(struct tmfs_opt_context *ctx, const char *arg)
 {
-	return fuse_opt_add_arg(&ctx->outargs, arg);
+	return tmfs_opt_add_arg(&ctx->outargs, arg);
 }
 
 static int add_opt_common(char **opts, const char *opt, int esc)
@@ -138,28 +138,28 @@ static int add_opt_common(char **opts, const char *opt, int esc)
 	return 0;
 }
 
-int fuse_opt_add_opt(char **opts, const char *opt)
+int tmfs_opt_add_opt(char **opts, const char *opt)
 {
 	return add_opt_common(opts, opt, 0);
 }
 
-int fuse_opt_add_opt_escaped(char **opts, const char *opt)
+int tmfs_opt_add_opt_escaped(char **opts, const char *opt)
 {
 	return add_opt_common(opts, opt, 1);
 }
 
-static int add_opt(struct fuse_opt_context *ctx, const char *opt)
+static int add_opt(struct tmfs_opt_context *ctx, const char *opt)
 {
 	return add_opt_common(&ctx->opts, opt, 1);
 }
 
-static int call_proc(struct fuse_opt_context *ctx, const char *arg, int key,
+static int call_proc(struct tmfs_opt_context *ctx, const char *arg, int key,
 		     int iso)
 {
-	if (key == FUSE_OPT_KEY_DISCARD)
+	if (key == TMFS_OPT_KEY_DISCARD)
 		return 0;
 
-	if (key != FUSE_OPT_KEY_KEEP && ctx->proc) {
+	if (key != TMFS_OPT_KEY_KEEP && ctx->proc) {
 		int res = ctx->proc(ctx->data, arg, key, &ctx->outargs);
 		if (res == -1 || !res)
 			return res;
@@ -191,7 +191,7 @@ static int match_template(const char *t, const char *arg, unsigned *sepp)
 	return 0;
 }
 
-static const struct fuse_opt *find_opt(const struct fuse_opt *opt,
+static const struct tmfs_opt *find_opt(const struct tmfs_opt *opt,
 				       const char *arg, unsigned *sepp)
 {
 	for (; opt && opt->templ; opt++)
@@ -200,7 +200,7 @@ static const struct fuse_opt *find_opt(const struct fuse_opt *opt,
 	return NULL;
 }
 
-int fuse_opt_match(const struct fuse_opt *opts, const char *opt)
+int tmfs_opt_match(const struct tmfs_opt *opts, const char *opt)
 {
 	unsigned dummy;
 	return find_opt(opts, opt, &dummy) ? 1 : 0;
@@ -218,15 +218,15 @@ static int process_opt_param(void *var, const char *format, const char *param,
 		*(char **) var = copy;
 	} else {
 		if (sscanf(param, format, var) != 1) {
-			fprintf(stderr, "fuse: invalid parameter in option `%s'\n", arg);
+			fprintf(stderr, "tmfs: invalid parameter in option `%s'\n", arg);
 			return -1;
 		}
 	}
 	return 0;
 }
 
-static int process_opt(struct fuse_opt_context *ctx,
-		       const struct fuse_opt *opt, unsigned sep,
+static int process_opt(struct tmfs_opt_context *ctx,
+		       const struct tmfs_opt *opt, unsigned sep,
 		       const char *arg, int iso)
 {
 	if (opt->offset == -1U) {
@@ -247,8 +247,8 @@ static int process_opt(struct fuse_opt_context *ctx,
 	return 0;
 }
 
-static int process_opt_sep_arg(struct fuse_opt_context *ctx,
-			       const struct fuse_opt *opt, unsigned sep,
+static int process_opt_sep_arg(struct tmfs_opt_context *ctx,
+			       const struct tmfs_opt *opt, unsigned sep,
 			       const char *arg, int iso)
 {
 	int res;
@@ -271,10 +271,10 @@ static int process_opt_sep_arg(struct fuse_opt_context *ctx,
 	return res;
 }
 
-static int process_gopt(struct fuse_opt_context *ctx, const char *arg, int iso)
+static int process_gopt(struct tmfs_opt_context *ctx, const char *arg, int iso)
 {
 	unsigned sep;
-	const struct fuse_opt *opt = find_opt(ctx->opt, arg, &sep);
+	const struct tmfs_opt *opt = find_opt(ctx->opt, arg, &sep);
 	if (opt) {
 		for (; opt; opt = find_opt(opt + 1, arg, &sep)) {
 			int res;
@@ -288,10 +288,10 @@ static int process_gopt(struct fuse_opt_context *ctx, const char *arg, int iso)
 		}
 		return 0;
 	} else
-		return call_proc(ctx, arg, FUSE_OPT_KEY_OPT, iso);
+		return call_proc(ctx, arg, TMFS_OPT_KEY_OPT, iso);
 }
 
-static int process_real_option_group(struct fuse_opt_context *ctx, char *opts)
+static int process_real_option_group(struct tmfs_opt_context *ctx, char *opts)
 {
 	char *s = opts;
 	char *d = s;
@@ -331,13 +331,13 @@ static int process_real_option_group(struct fuse_opt_context *ctx, char *opts)
 	return 0;
 }
 
-static int process_option_group(struct fuse_opt_context *ctx, const char *opts)
+static int process_option_group(struct tmfs_opt_context *ctx, const char *opts)
 {
 	int res;
 	char *copy = strdup(opts);
 
 	if (!copy) {
-		fprintf(stderr, "fuse: memory allocation failed\n");
+		fprintf(stderr, "tmfs: memory allocation failed\n");
 		return -1;
 	}
 	res = process_real_option_group(ctx, copy);
@@ -345,10 +345,10 @@ static int process_option_group(struct fuse_opt_context *ctx, const char *opts)
 	return res;
 }
 
-static int process_one(struct fuse_opt_context *ctx, const char *arg)
+static int process_one(struct tmfs_opt_context *ctx, const char *arg)
 {
 	if (ctx->nonopt || arg[0] != '-')
-		return call_proc(ctx, arg, FUSE_OPT_KEY_NONOPT, 0);
+		return call_proc(ctx, arg, TMFS_OPT_KEY_NONOPT, 0);
 	else if (arg[1] == 'o') {
 		if (arg[2])
 			return process_option_group(ctx, arg + 2);
@@ -368,7 +368,7 @@ static int process_one(struct fuse_opt_context *ctx, const char *arg)
 		return process_gopt(ctx, arg, 0);
 }
 
-static int opt_parse(struct fuse_opt_context *ctx)
+static int opt_parse(struct tmfs_opt_context *ctx)
 {
 	if (ctx->argc) {
 		if (add_arg(ctx, ctx->argv[0]) == -1)
@@ -380,8 +380,8 @@ static int opt_parse(struct fuse_opt_context *ctx)
 			return -1;
 
 	if (ctx->opts) {
-		if (fuse_opt_insert_arg(&ctx->outargs, 1, "-o") == -1 ||
-		    fuse_opt_insert_arg(&ctx->outargs, 2, ctx->opts) == -1)
+		if (tmfs_opt_insert_arg(&ctx->outargs, 1, "-o") == -1 ||
+		    tmfs_opt_insert_arg(&ctx->outargs, 2, ctx->opts) == -1)
 			return -1;
 	}
 
@@ -395,11 +395,11 @@ static int opt_parse(struct fuse_opt_context *ctx)
 	return 0;
 }
 
-int fuse_opt_parse(struct fuse_args *args, void *data,
-		   const struct fuse_opt opts[], fuse_opt_proc_t proc)
+int tmfs_opt_parse(struct tmfs_args *args, void *data,
+		   const struct tmfs_opt opts[], tmfs_opt_proc_t proc)
 {
 	int res;
-	struct fuse_opt_context ctx = {
+	struct tmfs_opt_context ctx = {
 		.data = data,
 		.opt = opts,
 		.proc = proc,
@@ -413,14 +413,14 @@ int fuse_opt_parse(struct fuse_args *args, void *data,
 
 	res = opt_parse(&ctx);
 	if (res != -1) {
-		struct fuse_args tmp = *args;
+		struct tmfs_args tmp = *args;
 		*args = ctx.outargs;
 		ctx.outargs = tmp;
 	}
 	free(ctx.opts);
-	fuse_opt_free_args(&ctx.outargs);
+	tmfs_opt_free_args(&ctx.outargs);
 	return res;
 }
 
 /* This symbol version was mistakenly added to the version script */
-FUSE_SYMVER(".symver fuse_opt_insert_arg_compat,fuse_opt_insert_arg@FUSE_2.5");
+TMFS_SYMVER(".symver tmfs_opt_insert_arg_compat,tmfs_opt_insert_arg@TMFS_2.5");

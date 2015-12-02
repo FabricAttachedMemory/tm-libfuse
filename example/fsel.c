@@ -1,17 +1,17 @@
 /*
-  FUSE fsel: FUSE select example
+  TMFS fsel: TMFS select example
   Copyright (C) 2008       SUSE Linux Products GmbH
   Copyright (C) 2008       Tejun Heo <teheo@suse.de>
 
   This program can be distributed under the terms of the GNU GPL.
   See the file COPYING.
 
-  gcc -Wall fsel.c `pkg-config fuse --cflags --libs` -o fsel
+  gcc -Wall fsel.c `pkg-config tmfs --cflags --libs` -o fsel
 */
 
-#define FUSE_USE_VERSION 29
+#define TMFS_USE_VERSION 29
 
-#include <fuse.h>
+#include <tmfs.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <string.h>
@@ -30,14 +30,14 @@
  */
 static unsigned fsel_open_mask;
 static const char fsel_hex_map[] = "0123456789ABCDEF";
-static struct fuse *fsel_fuse;	/* needed for poll notification */
+static struct tmfs *fsel_tmfs;	/* needed for poll notification */
 
 #define FSEL_CNT_MAX	10	/* each file can store upto 10 chars */
 #define FSEL_FILES	16
 
 static pthread_mutex_t fsel_mutex;	/* protects notify_mask and cnt array */
 static unsigned fsel_poll_notify_mask;	/* poll notification scheduled? */
-static struct fuse_pollhandle *fsel_poll_handle[FSEL_FILES]; /* poll notify handles */
+static struct tmfs_pollhandle *fsel_poll_handle[FSEL_FILES]; /* poll notify handles */
 static unsigned fsel_cnt[FSEL_FILES];	/* nbytes stored in each file */
 
 static int fsel_path_index(const char *path)
@@ -71,8 +71,8 @@ static int fsel_getattr(const char *path, struct stat *stbuf)
 	return 0;
 }
 
-static int fsel_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-			off_t offset, struct fuse_file_info *fi)
+static int fsel_readdir(const char *path, void *buf, tmfs_fill_dir_t filler,
+			off_t offset, struct tmfs_file_info *fi)
 {
 	char name[2] = { };
 	int i;
@@ -91,7 +91,7 @@ static int fsel_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return 0;
 }
 
-static int fsel_open(const char *path, struct fuse_file_info *fi)
+static int fsel_open(const char *path, struct tmfs_file_info *fi)
 {
 	int idx = fsel_path_index(path);
 
@@ -106,7 +106,7 @@ static int fsel_open(const char *path, struct fuse_file_info *fi)
 	/*
 	 * fsel files are nonseekable somewhat pipe-like files which
 	 * gets filled up periodically by producer thread and consumed
-	 * on read.  Tell FUSE as such.
+	 * on read.  Tell TMFS as such.
 	 */
 	fi->fh = idx;
 	fi->direct_io = 1;
@@ -115,7 +115,7 @@ static int fsel_open(const char *path, struct fuse_file_info *fi)
 	return 0;
 }
 
-static int fsel_release(const char *path, struct fuse_file_info *fi)
+static int fsel_release(const char *path, struct tmfs_file_info *fi)
 {
 	int idx = fi->fh;
 
@@ -126,7 +126,7 @@ static int fsel_release(const char *path, struct fuse_file_info *fi)
 }
 
 static int fsel_read(const char *path, char *buf, size_t size, off_t offset,
-		     struct fuse_file_info *fi)
+		     struct tmfs_file_info *fi)
 {
 	int idx = fi->fh;
 
@@ -144,8 +144,8 @@ static int fsel_read(const char *path, char *buf, size_t size, off_t offset,
 	return size;
 }
 
-static int fsel_poll(const char *path, struct fuse_file_info *fi,
-		     struct fuse_pollhandle *ph, unsigned *reventsp)
+static int fsel_poll(const char *path, struct tmfs_file_info *fi,
+		     struct tmfs_pollhandle *ph, unsigned *reventsp)
 {
 	static unsigned polled_zero;
 	int idx = fi->fh;
@@ -153,24 +153,24 @@ static int fsel_poll(const char *path, struct fuse_file_info *fi,
 	(void) path;
 
 	/*
-	 * Poll notification requires pointer to struct fuse which
-	 * can't be obtained when using fuse_main().  As notification
+	 * Poll notification requires pointer to struct tmfs which
+	 * can't be obtained when using tmfs_main().  As notification
 	 * happens only after poll is called, fill it here from
-	 * fuse_context.
+	 * tmfs_context.
 	 */
-	if (!fsel_fuse) {
-		struct fuse_context *cxt = fuse_get_context();
+	if (!fsel_tmfs) {
+		struct tmfs_context *cxt = tmfs_get_context();
 		if (cxt)
-			fsel_fuse = cxt->fuse;
+			fsel_tmfs = cxt->tmfs;
 	}
 
 	pthread_mutex_lock(&fsel_mutex);
 
 	if (ph != NULL) {
-		struct fuse_pollhandle *oldph = fsel_poll_handle[idx];
+		struct tmfs_pollhandle *oldph = fsel_poll_handle[idx];
 
 		if (oldph)
-			fuse_pollhandle_destroy(oldph);
+			tmfs_pollhandle_destroy(oldph);
 
 		fsel_poll_notify_mask |= (1 << idx);
 		fsel_poll_handle[idx] = ph;
@@ -188,7 +188,7 @@ static int fsel_poll(const char *path, struct fuse_file_info *fi,
 	return 0;
 }
 
-static struct fuse_operations fsel_oper = {
+static struct tmfs_operations fsel_oper = {
 	.getattr	= fsel_getattr,
 	.readdir	= fsel_readdir,
 	.open		= fsel_open,
@@ -221,13 +221,13 @@ static void *fsel_producer(void *data)
 				continue;
 
 			fsel_cnt[t]++;
-			if (fsel_fuse && (fsel_poll_notify_mask & (1 << t))) {
-				struct fuse_pollhandle *ph;
+			if (fsel_tmfs && (fsel_poll_notify_mask & (1 << t))) {
+				struct tmfs_pollhandle *ph;
 
 				printf("NOTIFY %X\n", t);
 				ph = fsel_poll_handle[t];
-				fuse_notify_poll(ph);
-				fuse_pollhandle_destroy(ph);
+				tmfs_notify_poll(ph);
+				tmfs_pollhandle_destroy(ph);
 				fsel_poll_notify_mask &= ~(1 << t);
 				fsel_poll_handle[t] = NULL;
 			}
@@ -269,7 +269,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	ret = fuse_main(argc, argv, &fsel_oper, NULL);
+	ret = tmfs_main(argc, argv, &fsel_oper, NULL);
 
 	pthread_cancel(producer);
 	pthread_join(producer, NULL);

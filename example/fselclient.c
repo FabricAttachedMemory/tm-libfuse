@@ -1,5 +1,5 @@
 /*
-  FUSE fselclient: FUSE select example client
+  TMFS fselclient: TMFS select example client
   Copyright (C) 2008       SUSE Linux Products GmbH
   Copyright (C) 2008       Tejun Heo <teheo@suse.de>
 

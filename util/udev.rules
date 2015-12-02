@@ -1,1 +1,1 @@
-KERNEL=="fuse", MODE="0666"
+KERNEL=="tmfs", MODE="0666"

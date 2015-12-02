@@ -1,17 +1,17 @@
 ## Process this file with automake to produce Makefile.in
 
-fuseincludedir=$(includedir)/fuse
+tmfsincludedir=$(includedir)/tmfs
 
-fuseinclude_HEADERS = \
-	fuse.h			\
-	fuse_compat.h		\
-	fuse_common.h		\
-	fuse_common_compat.h    \
-	fuse_lowlevel.h		\
-	fuse_lowlevel_compat.h	\
-	fuse_opt.h		\
-	cuse_lowlevel.h
+tmfsinclude_HEADERS = \
+	tmfs.h			\
+	tmfs_compat.h		\
+	tmfs_common.h		\
+	tmfs_common_compat.h    \
+	tmfs_lowlevel.h		\
+	tmfs_lowlevel_compat.h	\
+	tmfs_opt.h		\
+	tmcd_lowlevel.h
 
-include_HEADERS = old/fuse.h ulockmgr.h
+include_HEADERS = old/tmfs.h ulockmgr.h
 
-noinst_HEADERS = fuse_kernel.h
+noinst_HEADERS = tmfs_kernel.h

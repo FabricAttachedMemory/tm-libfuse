@@ -1,11 +1,11 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU GPL.
   See the file COPYING.
 */
-/* This program does the mounting and unmounting of FUSE filesystems */
+/* This program does the mounting and unmounting of TMFS filesystems */
 
 #define _GNU_SOURCE /* for clone */
 #include <config.h>
@@ -30,12 +30,12 @@
 #include <sys/utsname.h>
 #include <sched.h>
 
-#define FUSE_COMMFD_ENV		"_FUSE_COMMFD"
+#define TMFS_COMMFD_ENV		"_TMFS_COMMFD"
 
-#define FUSE_DEV_OLD "/proc/fs/fuse/dev"
-#define FUSE_DEV_NEW "/dev/fuse"
-#define FUSE_VERSION_FILE_OLD "/proc/fs/fuse/version"
-#define FUSE_CONF "/etc/fuse.conf"
+#define TMFS_DEV_OLD "/proc/fs/tmfs/dev"
+#define TMFS_DEV_NEW "/dev/tmfs"
+#define TMFS_VERSION_FILE_OLD "/proc/fs/tmfs/version"
+#define TMFS_CONF "/etc/tmfs.conf"
 
 #ifndef MS_DIRSYNC
 #define MS_DIRSYNC 128
@@ -100,7 +100,7 @@ static void restore_privs(void)
  */
 static int lock_umount(void)
 {
-	const char *mtab_lock = _PATH_MOUNTED ".fuselock";
+	const char *mtab_lock = _PATH_MOUNTED ".tmfslock";
 	int mtablock;
 	int res;
 	struct stat mtab_stat;
@@ -111,7 +111,7 @@ static int lock_umount(void)
 
 	mtablock = open(mtab_lock, O_RDWR | O_CREAT, 0600);
 	if (mtablock == -1) {
-		fprintf(stderr, "%s: unable to open fuse lock file: %s\n",
+		fprintf(stderr, "%s: unable to open tmfs lock file: %s\n",
 			progname, strerror(errno));
 		return -1;
 	}
@@ -143,7 +143,7 @@ static void unlock_umount(int mtablock)
 static int add_mount(const char *source, const char *mnt, const char *type,
 		     const char *opts)
 {
-	return fuse_mnt_add_mount(progname, source, mnt, type, opts);
+	return tmfs_mnt_add_mount(progname, source, mnt, type, opts);
 }
 
 static int may_unmount(const char *mnt, int quiet)
@@ -172,10 +172,10 @@ static int may_unmount(const char *mnt, int quiet)
 	found = 0;
 	while ((entp = getmntent(fp)) != NULL) {
 		if (!found && strcmp(entp->mnt_dir, mnt) == 0 &&
-		    (strcmp(entp->mnt_type, "fuse") == 0 ||
-		     strcmp(entp->mnt_type, "fuseblk") == 0 ||
-		     strncmp(entp->mnt_type, "fuse.", 5) == 0 ||
-		     strncmp(entp->mnt_type, "fuseblk.", 8) == 0)) {
+		    (strcmp(entp->mnt_type, "tmfs") == 0 ||
+		     strcmp(entp->mnt_type, "tmfsblk") == 0 ||
+		     strncmp(entp->mnt_type, "tmfs.", 5) == 0 ||
+		     strncmp(entp->mnt_type, "tmfsblk.", 8) == 0)) {
 			char *p = strstr(entp->mnt_opts, "user=");
 			if (p &&
 			    (p == entp->mnt_opts || *(p-1) == ',') &&
@@ -211,10 +211,10 @@ static int may_unmount(const char *mnt, int quiet)
 }
 
 /*
- * Check whether the file specified in "fusermount -u" is really a
+ * Check whether the file specified in "tmfsrmount -u" is really a
  * mountpoint and not a symlink.  This is necessary otherwise the user
  * could move the mountpoint away and replace it with a symlink
- * pointing to an arbitrary mount, thereby tricking fusermount into
+ * pointing to an arbitrary mount, thereby tricking tmfsrmount into
  * unmounting that (umount(2) will follow symlinks).
  *
  * This is the child process running in a separate mount namespace, so
@@ -408,7 +408,7 @@ static int umount_nofollow_support(void)
 	return 1;
 }
 
-static int unmount_fuse_locked(const char *mnt, int quiet, int lazy)
+static int unmount_tmfs_locked(const char *mnt, int quiet, int lazy)
 {
 	int res;
 	char *copy;
@@ -455,21 +455,21 @@ out:
 		return -1;
 	}
 
-	return fuse_mnt_remove_mount(progname, mnt);
+	return tmfs_mnt_remove_mount(progname, mnt);
 }
 
-static int unmount_fuse(const char *mnt, int quiet, int lazy)
+static int unmount_tmfs(const char *mnt, int quiet, int lazy)
 {
 	int res;
 	int mtablock = lock_umount();
 
-	res = unmount_fuse_locked(mnt, quiet, lazy);
+	res = unmount_tmfs_locked(mnt, quiet, lazy);
 	unlock_umount(mtablock);
 
 	return res;
 }
 
-static int count_fuse_fs(void)
+static int count_tmfs_fs(void)
 {
 	struct mntent *entp;
 	int count = 0;
@@ -481,8 +481,8 @@ static int count_fuse_fs(void)
 		return -1;
 	}
 	while ((entp = getmntent(fp)) != NULL) {
-		if (strcmp(entp->mnt_type, "fuse") == 0 ||
-		    strncmp(entp->mnt_type, "fuse.", 5) == 0)
+		if (strcmp(entp->mnt_type, "tmfs") == 0 ||
+		    strncmp(entp->mnt_type, "tmfs.", 5) == 0)
 			count ++;
 	}
 	endmntent(fp);
@@ -491,7 +491,7 @@ static int count_fuse_fs(void)
 
 
 #else /* IGNORE_MTAB */
-static int count_fuse_fs()
+static int count_tmfs_fs()
 {
 	return 0;
 }
@@ -506,9 +506,9 @@ static int add_mount(const char *source, const char *mnt, const char *type,
 	return 0;
 }
 
-static int unmount_fuse(const char *mnt, int quiet, int lazy)
+static int unmount_tmfs(const char *mnt, int quiet, int lazy)
 {
-	return fuse_mnt_umount(progname, mnt, mnt, lazy);
+	return tmfs_mnt_umount(progname, mnt, mnt, lazy);
 }
 #endif /* IGNORE_MTAB */
 
@@ -535,12 +535,12 @@ static void parse_line(char *line, int linenum)
 	else if(line[0])
 		fprintf(stderr,
 			"%s: unknown parameter in %s at line %i: '%s'\n",
-			progname, FUSE_CONF, linenum, line);
+			progname, TMFS_CONF, linenum, line);
 }
 
 static void read_conf(void)
 {
-	FILE *fp = fopen(FUSE_CONF, "r");
+	FILE *fp = fopen(TMFS_CONF, "r");
 	if (fp != NULL) {
 		int linenum = 1;
 		char line[256];
@@ -554,7 +554,7 @@ static void read_conf(void)
 					isnewline = 0;
 				}
 			} else if(line[strlen(line)-1] == '\n') {
-				fprintf(stderr, "%s: reading %s: line %i too long\n", progname, FUSE_CONF, linenum);
+				fprintf(stderr, "%s: reading %s: line %i too long\n", progname, TMFS_CONF, linenum);
 
 				isnewline = 1;
 			}
@@ -562,13 +562,13 @@ static void read_conf(void)
 				linenum ++;
 		}
 		if (!isnewline) {
-			fprintf(stderr, "%s: reading %s: missing newline at end of file\n", progname, FUSE_CONF);
+			fprintf(stderr, "%s: reading %s: missing newline at end of file\n", progname, TMFS_CONF);
 
 		}
 		fclose(fp);
 	} else if (errno != ENOENT) {
 		fprintf(stderr, "%s: failed to open %s: %s\n",
-			progname, FUSE_CONF, strerror(errno));
+			progname, TMFS_CONF, strerror(errno));
 	}
 }
 
@@ -785,7 +785,7 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
 			if (getuid() != 0 && !user_allow_other &&
 			    (opt_eq(s, len, "allow_other") ||
 			     opt_eq(s, len, "allow_root"))) {
-				fprintf(stderr, "%s: option %.*s only allowed if 'user_allow_other' is set in /etc/fuse.conf\n", progname, len, s);
+				fprintf(stderr, "%s: option %.*s only allowed if 'user_allow_other' is set in /etc/tmfs.conf\n", progname, len, s);
 				goto err;
 			}
 			if (!skip_option) {
@@ -814,7 +814,7 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
 		fd, rootmode, getuid(), getgid());
 
 	if (check_empty &&
-	    fuse_mnt_check_empty(progname, mnt, rootmode, rootsize) == -1)
+	    tmfs_mnt_check_empty(progname, mnt, rootmode, rootsize) == -1)
 		goto err;
 
 	source = malloc((fsname ? strlen(fsname) : 0) +
@@ -827,9 +827,9 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
 	}
 
 	if (subtype)
-		sprintf(type, "%s.%s", blkdev ? "fuseblk" : "fuse", subtype);
+		sprintf(type, "%s.%s", blkdev ? "tmfsblk" : "tmfs", subtype);
 	else
-		strcpy(type, blkdev ? "fuseblk" : "fuse");
+		strcpy(type, blkdev ? "tmfsblk" : "tmfs");
 
 	if (fsname)
 		strcpy(source, fsname);
@@ -839,7 +839,7 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
 	res = mount(source, mnt, type, flags, optbuf);
 	if (res == -1 && errno == ENODEV && subtype) {
 		/* Probably missing subtype support */
-		strcpy(type, blkdev ? "fuseblk" : "fuse");
+		strcpy(type, blkdev ? "tmfsblk" : "tmfs");
 		if (fsname) {
 			if (!blkdev)
 				sprintf(source, "%s#%s", subtype, fsname);
@@ -857,8 +857,8 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
 	}
 	if (res == -1) {
 		int errno_save = errno;
-		if (blkdev && errno == ENODEV && !fuse_mnt_check_fuseblk())
-			fprintf(stderr, "%s: 'fuseblk' support missing\n",
+		if (blkdev && errno == ENODEV && !tmfs_mnt_check_tmfsblk())
+			fprintf(stderr, "%s: 'tmfsblk' support missing\n",
 				progname);
 		else
 			fprintf(stderr, "%s: mount failed: %s\n", progname,
@@ -891,10 +891,10 @@ static int check_version(const char *dev)
 	const char *version_file;
 	FILE *vf;
 
-	if (strcmp(dev, FUSE_DEV_OLD) != 0)
+	if (strcmp(dev, TMFS_DEV_OLD) != 0)
 		return 0;
 
-	version_file = FUSE_VERSION_FILE_OLD;
+	version_file = TMFS_VERSION_FILE_OLD;
 	vf = fopen(version_file, "r");
 	if (vf == NULL) {
 		fprintf(stderr, "%s: kernel interface too old\n", progname);
@@ -1016,40 +1016,40 @@ static int try_open(const char *dev, char **devp, int silent)
 	return fd;
 }
 
-static int try_open_fuse_device(char **devp)
+static int try_open_tmfs_device(char **devp)
 {
 	int fd;
 	int err;
 
 	drop_privs();
-	fd = try_open(FUSE_DEV_NEW, devp, 0);
+	fd = try_open(TMFS_DEV_NEW, devp, 0);
 	restore_privs();
 	if (fd >= 0)
 		return fd;
 
 	err = fd;
-	fd = try_open(FUSE_DEV_OLD, devp, 1);
+	fd = try_open(TMFS_DEV_OLD, devp, 1);
 	if (fd >= 0)
 		return fd;
 
 	return err;
 }
 
-static int open_fuse_device(char **devp)
+static int open_tmfs_device(char **devp)
 {
-	int fd = try_open_fuse_device(devp);
+	int fd = try_open_tmfs_device(devp);
 	if (fd >= -1)
 		return fd;
 
 	fprintf(stderr,
-		"%s: fuse device not found, try 'modprobe fuse' first\n",
+		"%s: tmfs device not found, try 'modprobe tmfs' first\n",
 		progname);
 
 	return -1;
 }
 
 
-static int mount_fuse(const char *mnt, const char *opts)
+static int mount_tmfs(const char *mnt, const char *opts)
 {
 	int res;
 	int fd;
@@ -1061,7 +1061,7 @@ static int mount_fuse(const char *mnt, const char *opts)
 	const char *real_mnt = mnt;
 	int mountpoint_fd = -1;
 
-	fd = open_fuse_device(&dev);
+	fd = open_tmfs_device(&dev);
 	if (fd == -1)
 		return -1;
 
@@ -1069,9 +1069,9 @@ static int mount_fuse(const char *mnt, const char *opts)
 	read_conf();
 
 	if (getuid() != 0 && mount_max != -1) {
-		int mount_count = count_fuse_fs();
+		int mount_count = count_tmfs_fs();
 		if (mount_count >= mount_max) {
-			fprintf(stderr, "%s: too many FUSE filesystems mounted; mount_max=N can be set in /etc/fuse.conf\n", progname);
+			fprintf(stderr, "%s: too many TMFS filesystems mounted; mount_max=N can be set in /etc/tmfs.conf\n", progname);
 			goto fail_close_fd;
 		}
 	}
@@ -1174,7 +1174,7 @@ static void usage(void)
 
 static void show_version(void)
 {
-	printf("fusermount version: %s\n", PACKAGE_VERSION);
+	printf("tmfsrmount version: %s\n", PACKAGE_VERSION);
 	exit(0);
 }
 
@@ -1256,7 +1256,7 @@ int main(int argc, char *argv[])
 	origmnt = argv[optind];
 
 	drop_privs();
-	mnt = fuse_mnt_resolve_path(progname, origmnt);
+	mnt = tmfs_mnt_resolve_path(progname, origmnt);
 	if (mnt != NULL) {
 		res = chdir("/");
 		if (res == -1) {
@@ -1272,14 +1272,14 @@ int main(int argc, char *argv[])
 	if (unmount)
 		goto do_unmount;
 
-	commfd = getenv(FUSE_COMMFD_ENV);
+	commfd = getenv(TMFS_COMMFD_ENV);
 	if (commfd == NULL) {
 		fprintf(stderr, "%s: old style mounting not supported\n",
 			progname);
 		exit(1);
 	}
 
-	fd = mount_fuse(mnt, opts);
+	fd = mount_tmfs(mnt, opts);
 	if (fd == -1)
 		exit(1);
 
@@ -1324,7 +1324,7 @@ int main(int argc, char *argv[])
 
 do_unmount:
 	if (geteuid() == 0)
-		res = unmount_fuse(mnt, quiet, lazy);
+		res = unmount_tmfs(mnt, quiet, lazy);
 	else {
 		res = umount2(mnt, lazy ? UMOUNT_DETACH : 0);
 		if (res == -1 && !quiet)

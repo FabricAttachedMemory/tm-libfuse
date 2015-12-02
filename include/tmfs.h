@@ -1,29 +1,29 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
   This program can be distributed under the terms of the GNU LGPLv2.
   See the file COPYING.LIB.
 */
 
-#ifndef _FUSE_H_
-#define _FUSE_H_
+#ifndef _TMFS_H_
+#define _TMFS_H_
 
 /** @file
  *
- * This file defines the library interface of FUSE
+ * This file defines the library interface of TMFS
  *
- * IMPORTANT: you should define FUSE_USE_VERSION before including this
+ * IMPORTANT: you should define TMFS_USE_VERSION before including this
  * header.  To use the newest API define it to 26 (recommended for any
  * new application), to use the old API define it to 21 (default) 22
  * or 25, to use the even older 1.X API define it to 11.
  */
 
-#ifndef FUSE_USE_VERSION
-#define FUSE_USE_VERSION 21
+#ifndef TMFS_USE_VERSION
+#define TMFS_USE_VERSION 21
 #endif
 
-#include "fuse_common.h"
+#include "tmfs_common.h"
 
 #include <fcntl.h>
 #include <time.h>
@@ -38,14 +38,14 @@ extern "C" {
 #endif
 
 /* ----------------------------------------------------------- *
- * Basic FUSE API					       *
+ * Basic TMFS API					       *
  * ----------------------------------------------------------- */
 
-/** Handle for a FUSE filesystem */
-struct fuse;
+/** Handle for a TMFS filesystem */
+struct tmfs;
 
 /** Structure containing a raw command */
-struct fuse_cmd;
+struct tmfs_cmd;
 
 /** Function to add an entry in a readdir() operation
  *
@@ -55,12 +55,12 @@ struct fuse_cmd;
  * @param off offset of the next entry or zero
  * @return 1 if buffer is full, zero otherwise
  */
-typedef int (*fuse_fill_dir_t) (void *buf, const char *name,
+typedef int (*tmfs_fill_dir_t) (void *buf, const char *name,
 				const struct stat *stbuf, off_t off);
 
 /* Used by deprecated getdir() method */
-typedef struct fuse_dirhandle *fuse_dirh_t;
-typedef int (*fuse_dirfil_t) (fuse_dirh_t h, const char *name, int type,
+typedef struct tmfs_dirhandle *tmfs_dirh_t;
+typedef int (*tmfs_dirfil_t) (tmfs_dirh_t h, const char *name, int type,
 			      ino_t ino);
 
 /**
@@ -79,13 +79,13 @@ typedef int (*fuse_dirfil_t) (fuse_dirh_t h, const char *name, int type,
  *
  * Almost all operations take a path which can be of any length.
  *
- * Changed in fuse 2.8.0 (regardless of API version)
+ * Changed in tmfs 2.8.0 (regardless of API version)
  * Previously, paths were limited to a length of PATH_MAX.
  *
- * See http://fuse.sourceforge.net/wiki/ for more information.  There
+ * See http://tmfs.sourceforge.net/wiki/ for more information.  There
  * is also a snapshot of the relevant wiki pages in the doc/ folder.
  */
-struct fuse_operations {
+struct tmfs_operations {
 	/** Get file attributes.
 	 *
 	 * Similar to stat().  The 'st_dev' and 'st_blksize' fields are
@@ -105,7 +105,7 @@ struct fuse_operations {
 	int (*readlink) (const char *, char *, size_t);
 
 	/* Deprecated, use readdir() instead */
-	int (*getdir) (const char *, fuse_dirh_t, fuse_dirfil_t);
+	int (*getdir) (const char *, tmfs_dirh_t, tmfs_dirfil_t);
 
 	/** Create a file node
 	 *
@@ -157,7 +157,7 @@ struct fuse_operations {
 	 *
 	 * No creation (O_CREAT, O_EXCL) and by default also no
 	 * truncation (O_TRUNC) flags will be passed to open(). If an
-	 * application specifies O_TRUNC, fuse first calls truncate()
+	 * application specifies O_TRUNC, tmfs first calls truncate()
 	 * and then open(). Only if 'atomic_o_trunc' has been
 	 * specified and kernel version is 2.6.24 or later, O_TRUNC is
 	 * passed on to open.
@@ -165,12 +165,12 @@ struct fuse_operations {
 	 * Unless the 'default_permissions' mount option is given,
 	 * open should check if the operation is permitted for the
 	 * given flags. Optionally open may also return an arbitrary
-	 * filehandle in the fuse_file_info structure, which will be
+	 * filehandle in the tmfs_file_info structure, which will be
 	 * passed to all file operations.
 	 *
 	 * Changed in version 2.2
 	 */
-	int (*open) (const char *, struct fuse_file_info *);
+	int (*open) (const char *, struct tmfs_file_info *);
 
 	/** Read data from an open file
 	 *
@@ -184,7 +184,7 @@ struct fuse_operations {
 	 * Changed in version 2.2
 	 */
 	int (*read) (const char *, char *, size_t, off_t,
-		     struct fuse_file_info *);
+		     struct tmfs_file_info *);
 
 	/** Write data to an open file
 	 *
@@ -195,7 +195,7 @@ struct fuse_operations {
 	 * Changed in version 2.2
 	 */
 	int (*write) (const char *, const char *, size_t, off_t,
-		      struct fuse_file_info *);
+		      struct tmfs_file_info *);
 
 	/** Get file system statistics
 	 *
@@ -229,7 +229,7 @@ struct fuse_operations {
 	 *
 	 * Changed in version 2.2
 	 */
-	int (*flush) (const char *, struct fuse_file_info *);
+	int (*flush) (const char *, struct tmfs_file_info *);
 
 	/** Release an open file
 	 *
@@ -245,7 +245,7 @@ struct fuse_operations {
 	 *
 	 * Changed in version 2.2
 	 */
-	int (*release) (const char *, struct fuse_file_info *);
+	int (*release) (const char *, struct tmfs_file_info *);
 
 	/** Synchronize file contents
 	 *
@@ -254,7 +254,7 @@ struct fuse_operations {
 	 *
 	 * Changed in version 2.2
 	 */
-	int (*fsync) (const char *, int, struct fuse_file_info *);
+	int (*fsync) (const char *, int, struct tmfs_file_info *);
 
 	/** Set extended attributes */
 	int (*setxattr) (const char *, const char *, const char *, size_t, int);
@@ -273,12 +273,12 @@ struct fuse_operations {
 	 * Unless the 'default_permissions' mount option is given,
 	 * this method should check if opendir is permitted for this
 	 * directory. Optionally opendir may also return an arbitrary
-	 * filehandle in the fuse_file_info structure, which will be
+	 * filehandle in the tmfs_file_info structure, which will be
 	 * passed to readdir, closedir and fsyncdir.
 	 *
 	 * Introduced in version 2.3
 	 */
-	int (*opendir) (const char *, struct fuse_file_info *);
+	int (*opendir) (const char *, struct tmfs_file_info *);
 
 	/** Read directory
 	 *
@@ -301,14 +301,14 @@ struct fuse_operations {
 	 *
 	 * Introduced in version 2.3
 	 */
-	int (*readdir) (const char *, void *, fuse_fill_dir_t, off_t,
-			struct fuse_file_info *);
+	int (*readdir) (const char *, void *, tmfs_fill_dir_t, off_t,
+			struct tmfs_file_info *);
 
 	/** Release directory
 	 *
 	 * Introduced in version 2.3
 	 */
-	int (*releasedir) (const char *, struct fuse_file_info *);
+	int (*releasedir) (const char *, struct tmfs_file_info *);
 
 	/** Synchronize directory contents
 	 *
@@ -317,19 +317,19 @@ struct fuse_operations {
 	 *
 	 * Introduced in version 2.3
 	 */
-	int (*fsyncdir) (const char *, int, struct fuse_file_info *);
+	int (*fsyncdir) (const char *, int, struct tmfs_file_info *);
 
 	/**
 	 * Initialize filesystem
 	 *
 	 * The return value will passed in the private_data field of
-	 * fuse_context to all file operations and as a parameter to the
+	 * tmfs_context to all file operations and as a parameter to the
 	 * destroy() method.
 	 *
 	 * Introduced in version 2.3
 	 * Changed in version 2.6
 	 */
-	void *(*init) (struct fuse_conn_info *conn);
+	void *(*init) (struct tmfs_conn_info *conn);
 
 	/**
 	 * Clean up filesystem
@@ -365,7 +365,7 @@ struct fuse_operations {
 	 *
 	 * Introduced in version 2.5
 	 */
-	int (*create) (const char *, mode_t, struct fuse_file_info *);
+	int (*create) (const char *, mode_t, struct tmfs_file_info *);
 
 	/**
 	 * Change the size of an open file
@@ -379,7 +379,7 @@ struct fuse_operations {
 	 *
 	 * Introduced in version 2.5
 	 */
-	int (*ftruncate) (const char *, off_t, struct fuse_file_info *);
+	int (*ftruncate) (const char *, off_t, struct tmfs_file_info *);
 
 	/**
 	 * Get attributes from an open file
@@ -393,7 +393,7 @@ struct fuse_operations {
 	 *
 	 * Introduced in version 2.5
 	 */
-	int (*fgetattr) (const char *, struct stat *, struct fuse_file_info *);
+	int (*fgetattr) (const char *, struct stat *, struct tmfs_file_info *);
 
 	/**
 	 * Perform POSIX file locking operation
@@ -404,7 +404,7 @@ struct fuse_operations {
 	 * for fcntl(2).  The l_whence field will always be set to
 	 * SEEK_SET.
 	 *
-	 * For checking lock ownership, the 'fuse_file_info->owner'
+	 * For checking lock ownership, the 'tmfs_file_info->owner'
 	 * argument must be used.
 	 *
 	 * For F_GETLK operation, the library will first check currently
@@ -427,7 +427,7 @@ struct fuse_operations {
 	 *
 	 * Introduced in version 2.6
 	 */
-	int (*lock) (const char *, struct fuse_file_info *, int cmd,
+	int (*lock) (const char *, struct tmfs_file_info *, int cmd,
 		     struct flock *);
 
 	/**
@@ -493,27 +493,27 @@ struct fuse_operations {
 	/**
 	 * Ioctl
 	 *
-	 * flags will have FUSE_IOCTL_COMPAT set for 32bit ioctls in
+	 * flags will have TMFS_IOCTL_COMPAT set for 32bit ioctls in
 	 * 64bit environment.  The size and direction of data is
 	 * determined by _IOC_*() decoding of cmd.  For _IOC_NONE,
 	 * data will be NULL, for _IOC_WRITE data is out area, for
 	 * _IOC_READ in area and if both are set in/out area.  In all
 	 * non-NULL cases, the area is of _IOC_SIZE(cmd) bytes.
 	 *
-	 * If flags has FUSE_IOCTL_DIR then the fuse_file_info refers to a
+	 * If flags has TMFS_IOCTL_DIR then the tmfs_file_info refers to a
 	 * directory file handle.
 	 *
 	 * Introduced in version 2.8
 	 */
 	int (*ioctl) (const char *, int cmd, void *arg,
-		      struct fuse_file_info *, unsigned int flags, void *data);
+		      struct tmfs_file_info *, unsigned int flags, void *data);
 
 	/**
 	 * Poll for IO readiness events
 	 *
 	 * Note: If ph is non-NULL, the client should notify
 	 * when IO readiness events occur by calling
-	 * fuse_notify_poll() with the specified ph.
+	 * tmfs_notify_poll() with the specified ph.
 	 *
 	 * Regardless of the number of times poll with a non-NULL ph
 	 * is received, single notification is enough to clear all.
@@ -521,23 +521,23 @@ struct fuse_operations {
 	 * correctness.
 	 *
 	 * The callee is responsible for destroying ph with
-	 * fuse_pollhandle_destroy() when no longer in use.
+	 * tmfs_pollhandle_destroy() when no longer in use.
 	 *
 	 * Introduced in version 2.8
 	 */
-	int (*poll) (const char *, struct fuse_file_info *,
-		     struct fuse_pollhandle *ph, unsigned *reventsp);
+	int (*poll) (const char *, struct tmfs_file_info *,
+		     struct tmfs_pollhandle *ph, unsigned *reventsp);
 
 	/** Write contents of buffer to an open file
 	 *
 	 * Similar to the write() method, but data is supplied in a
-	 * generic buffer.  Use fuse_buf_copy() to transfer data to
+	 * generic buffer.  Use tmfs_buf_copy() to transfer data to
 	 * the destination.
 	 *
 	 * Introduced in version 2.9
 	 */
-	int (*write_buf) (const char *, struct fuse_bufvec *buf, off_t off,
-			  struct fuse_file_info *);
+	int (*write_buf) (const char *, struct tmfs_bufvec *buf, off_t off,
+			  struct tmfs_file_info *);
 
 	/** Store data from an open file in a buffer
 	 *
@@ -555,8 +555,8 @@ struct fuse_operations {
 	 *
 	 * Introduced in version 2.9
 	 */
-	int (*read_buf) (const char *, struct fuse_bufvec **bufp,
-			 size_t size, off_t off, struct fuse_file_info *);
+	int (*read_buf) (const char *, struct tmfs_bufvec **bufp,
+			 size_t size, off_t off, struct tmfs_file_info *);
 	/**
 	 * Perform BSD file locking operation
 	 *
@@ -577,7 +577,7 @@ struct fuse_operations {
 	 *
 	 * Introduced in version 2.9
 	 */
-	int (*flock) (const char *, struct fuse_file_info *, int op);
+	int (*flock) (const char *, struct tmfs_file_info *, int op);
 
 	/**
 	 * Allocates space for an open file
@@ -590,7 +590,7 @@ struct fuse_operations {
 	 * Introduced in version 2.9.1
 	 */
 	int (*fallocate) (const char *, int, off_t, off_t,
-			  struct fuse_file_info *);
+			  struct tmfs_file_info *);
 };
 
 /** Extra context that may be needed by some filesystems
@@ -598,9 +598,9 @@ struct fuse_operations {
  * The uid, gid and pid fields are not filled in case of a writepage
  * operation.
  */
-struct fuse_context {
-	/** Pointer to the fuse object */
-	struct fuse *fuse;
+struct tmfs_context {
+	/** Pointer to the tmfs object */
+	struct tmfs *tmfs;
 
 	/** User ID of the calling process */
 	uid_t uid;
@@ -619,17 +619,17 @@ struct fuse_context {
 };
 
 /**
- * Main function of FUSE.
+ * Main function of TMFS.
  *
  * This is for the lazy.  This is all that has to be called from the
  * main() function.
  *
  * This function does the following:
  *   - parses command line options (-d -s and -h)
- *   - passes relevant mount options to the fuse_mount()
+ *   - passes relevant mount options to the tmfs_mount()
  *   - installs signal handlers for INT, HUP, TERM and PIPE
  *   - registers an exit handler to unmount the filesystem on program exit
- *   - creates a fuse handle
+ *   - creates a tmfs handle
  *   - registers the operations
  *   - calls either the single-threaded or the multi-threaded event loop
  *
@@ -642,62 +642,62 @@ struct fuse_context {
  * @return 0 on success, nonzero on failure
  */
 /*
-  int fuse_main(int argc, char *argv[], const struct fuse_operations *op,
+  int tmfs_main(int argc, char *argv[], const struct tmfs_operations *op,
   void *user_data);
 */
-#define fuse_main(argc, argv, op, user_data)				\
-	fuse_main_real(argc, argv, op, sizeof(*(op)), user_data)
+#define tmfs_main(argc, argv, op, user_data)				\
+	tmfs_main_real(argc, argv, op, sizeof(*(op)), user_data)
 
 /* ----------------------------------------------------------- *
  * More detailed API					       *
  * ----------------------------------------------------------- */
 
 /**
- * Create a new FUSE filesystem.
+ * Create a new TMFS filesystem.
  *
  * @param ch the communication channel
  * @param args argument vector
  * @param op the filesystem operations
- * @param op_size the size of the fuse_operations structure
+ * @param op_size the size of the tmfs_operations structure
  * @param user_data user data supplied in the context during the init() method
- * @return the created FUSE handle
+ * @return the created TMFS handle
  */
-struct fuse *fuse_new(struct fuse_chan *ch, struct fuse_args *args,
-		      const struct fuse_operations *op, size_t op_size,
+struct tmfs *tmfs_new(struct tmfs_chan *ch, struct tmfs_args *args,
+		      const struct tmfs_operations *op, size_t op_size,
 		      void *user_data);
 
 /**
- * Destroy the FUSE handle.
+ * Destroy the TMFS handle.
  *
  * The communication channel attached to the handle is also destroyed.
  *
  * NOTE: This function does not unmount the filesystem.	 If this is
- * needed, call fuse_unmount() before calling this function.
+ * needed, call tmfs_unmount() before calling this function.
  *
- * @param f the FUSE handle
+ * @param f the TMFS handle
  */
-void fuse_destroy(struct fuse *f);
+void tmfs_destroy(struct tmfs *f);
 
 /**
- * FUSE event loop.
+ * TMFS event loop.
  *
  * Requests from the kernel are processed, and the appropriate
  * operations are called.
  *
- * @param f the FUSE handle
+ * @param f the TMFS handle
  * @return 0 if no error occurred, -1 otherwise
  */
-int fuse_loop(struct fuse *f);
+int tmfs_loop(struct tmfs *f);
 
 /**
  * Exit from event loop
  *
- * @param f the FUSE handle
+ * @param f the TMFS handle
  */
-void fuse_exit(struct fuse *f);
+void tmfs_exit(struct tmfs *f);
 
 /**
- * FUSE event loop with multiple threads
+ * TMFS event loop with multiple threads
  *
  * Requests from the kernel are processed, and the appropriate
  * operations are called.  Request are processed in parallel by
@@ -706,10 +706,10 @@ void fuse_exit(struct fuse *f);
  * Calling this function requires the pthreads library to be linked to
  * the application.
  *
- * @param f the FUSE handle
+ * @param f the TMFS handle
  * @return 0 if no error occurred, -1 otherwise
  */
-int fuse_loop_mt(struct fuse *f);
+int tmfs_loop_mt(struct tmfs *f);
 
 /**
  * Get the current context
@@ -719,7 +719,7 @@ int fuse_loop_mt(struct fuse *f);
  *
  * @return the context
  */
-struct fuse_context *fuse_get_context(void);
+struct tmfs_context *tmfs_get_context(void);
 
 /**
  * Get the current supplementary group IDs for the current request
@@ -728,7 +728,7 @@ struct fuse_context *fuse_get_context(void);
  * always the total number of group IDs, even if it is larger than the
  * specified size.
  *
- * The current fuse kernel module in linux (as of 2.6.30) doesn't pass
+ * The current tmfs kernel module in linux (as of 2.6.30) doesn't pass
  * the group list to userspace, hence this function needs to parse
  * "/proc/$TID/task/$TID/status" to get the group IDs.
  *
@@ -739,49 +739,49 @@ struct fuse_context *fuse_get_context(void);
  * @param list array of group IDs to be filled in
  * @return the total number of supplementary group IDs or -errno on failure
  */
-int fuse_getgroups(int size, gid_t list[]);
+int tmfs_getgroups(int size, gid_t list[]);
 
 /**
  * Check if the current request has already been interrupted
  *
  * @return 1 if the request has been interrupted, 0 otherwise
  */
-int fuse_interrupted(void);
+int tmfs_interrupted(void);
 
 /**
  * Obsolete, doesn't do anything
  *
  * @return -EINVAL
  */
-int fuse_invalidate(struct fuse *f, const char *path);
+int tmfs_invalidate(struct tmfs *f, const char *path);
 
 /* Deprecated, don't use */
-int fuse_is_lib_option(const char *opt);
+int tmfs_is_lib_option(const char *opt);
 
 /**
  * The real main function
  *
- * Do not call this directly, use fuse_main()
+ * Do not call this directly, use tmfs_main()
  */
-int fuse_main_real(int argc, char *argv[], const struct fuse_operations *op,
+int tmfs_main_real(int argc, char *argv[], const struct tmfs_operations *op,
 		   size_t op_size, void *user_data);
 
 /**
  * Start the cleanup thread when using option "remember".
  *
- * This is done automatically by fuse_loop_mt()
- * @param fuse struct fuse pointer for fuse instance
+ * This is done automatically by tmfs_loop_mt()
+ * @param tmfs struct tmfs pointer for tmfs instance
  * @return 0 on success and -1 on error
  */
-int fuse_start_cleanup_thread(struct fuse *fuse);
+int tmfs_start_cleanup_thread(struct tmfs *tmfs);
 
 /**
  * Stop the cleanup thread when using option "remember".
  *
- * This is done automatically by fuse_loop_mt()
- * @param fuse struct fuse pointer for fuse instance
+ * This is done automatically by tmfs_loop_mt()
+ * @param tmfs struct tmfs pointer for tmfs instance
  */
-void fuse_stop_cleanup_thread(struct fuse *fuse);
+void tmfs_stop_cleanup_thread(struct tmfs *tmfs);
 
 /**
  * Iterate over cache removing stale entries
@@ -789,10 +789,10 @@ void fuse_stop_cleanup_thread(struct fuse *fuse);
  *
  * NOTE: This is already done for the standard sessions
  *
- * @param fuse struct fuse pointer for fuse instance
+ * @param tmfs struct tmfs pointer for tmfs instance
  * @return the number of seconds until the next cleanup
  */
-int fuse_clean_cache(struct fuse *fuse);
+int tmfs_clean_cache(struct tmfs *tmfs);
 
 /*
  * Stacking API
@@ -803,121 +803,121 @@ int fuse_clean_cache(struct fuse *fuse);
  *
  * This is opaque object represents a filesystem layer
  */
-struct fuse_fs;
+struct tmfs_fs;
 
 /*
  * These functions call the relevant filesystem operation, and return
  * the result.
  *
  * If the operation is not defined, they return -ENOSYS, with the
- * exception of fuse_fs_open, fuse_fs_release, fuse_fs_opendir,
- * fuse_fs_releasedir and fuse_fs_statfs, which return 0.
+ * exception of tmfs_fs_open, tmfs_fs_release, tmfs_fs_opendir,
+ * tmfs_fs_releasedir and tmfs_fs_statfs, which return 0.
  */
 
-int fuse_fs_getattr(struct fuse_fs *fs, const char *path, struct stat *buf);
-int fuse_fs_fgetattr(struct fuse_fs *fs, const char *path, struct stat *buf,
-		     struct fuse_file_info *fi);
-int fuse_fs_rename(struct fuse_fs *fs, const char *oldpath,
+int tmfs_fs_getattr(struct tmfs_fs *fs, const char *path, struct stat *buf);
+int tmfs_fs_fgetattr(struct tmfs_fs *fs, const char *path, struct stat *buf,
+		     struct tmfs_file_info *fi);
+int tmfs_fs_rename(struct tmfs_fs *fs, const char *oldpath,
 		   const char *newpath);
-int fuse_fs_unlink(struct fuse_fs *fs, const char *path);
-int fuse_fs_rmdir(struct fuse_fs *fs, const char *path);
-int fuse_fs_symlink(struct fuse_fs *fs, const char *linkname,
+int tmfs_fs_unlink(struct tmfs_fs *fs, const char *path);
+int tmfs_fs_rmdir(struct tmfs_fs *fs, const char *path);
+int tmfs_fs_symlink(struct tmfs_fs *fs, const char *linkname,
 		    const char *path);
-int fuse_fs_link(struct fuse_fs *fs, const char *oldpath, const char *newpath);
-int fuse_fs_release(struct fuse_fs *fs,	 const char *path,
-		    struct fuse_file_info *fi);
-int fuse_fs_open(struct fuse_fs *fs, const char *path,
-		 struct fuse_file_info *fi);
-int fuse_fs_read(struct fuse_fs *fs, const char *path, char *buf, size_t size,
-		 off_t off, struct fuse_file_info *fi);
-int fuse_fs_read_buf(struct fuse_fs *fs, const char *path,
-		     struct fuse_bufvec **bufp, size_t size, off_t off,
-		     struct fuse_file_info *fi);
-int fuse_fs_write(struct fuse_fs *fs, const char *path, const char *buf,
-		  size_t size, off_t off, struct fuse_file_info *fi);
-int fuse_fs_write_buf(struct fuse_fs *fs, const char *path,
-		      struct fuse_bufvec *buf, off_t off,
-		      struct fuse_file_info *fi);
-int fuse_fs_fsync(struct fuse_fs *fs, const char *path, int datasync,
-		  struct fuse_file_info *fi);
-int fuse_fs_flush(struct fuse_fs *fs, const char *path,
-		  struct fuse_file_info *fi);
-int fuse_fs_statfs(struct fuse_fs *fs, const char *path, struct statvfs *buf);
-int fuse_fs_opendir(struct fuse_fs *fs, const char *path,
-		    struct fuse_file_info *fi);
-int fuse_fs_readdir(struct fuse_fs *fs, const char *path, void *buf,
-		    fuse_fill_dir_t filler, off_t off,
-		    struct fuse_file_info *fi);
-int fuse_fs_fsyncdir(struct fuse_fs *fs, const char *path, int datasync,
-		     struct fuse_file_info *fi);
-int fuse_fs_releasedir(struct fuse_fs *fs, const char *path,
-		       struct fuse_file_info *fi);
-int fuse_fs_create(struct fuse_fs *fs, const char *path, mode_t mode,
-		   struct fuse_file_info *fi);
-int fuse_fs_lock(struct fuse_fs *fs, const char *path,
-		 struct fuse_file_info *fi, int cmd, struct flock *lock);
-int fuse_fs_flock(struct fuse_fs *fs, const char *path,
-		  struct fuse_file_info *fi, int op);
-int fuse_fs_chmod(struct fuse_fs *fs, const char *path, mode_t mode);
-int fuse_fs_chown(struct fuse_fs *fs, const char *path, uid_t uid, gid_t gid);
-int fuse_fs_truncate(struct fuse_fs *fs, const char *path, off_t size);
-int fuse_fs_ftruncate(struct fuse_fs *fs, const char *path, off_t size,
-		      struct fuse_file_info *fi);
-int fuse_fs_utimens(struct fuse_fs *fs, const char *path,
+int tmfs_fs_link(struct tmfs_fs *fs, const char *oldpath, const char *newpath);
+int tmfs_fs_release(struct tmfs_fs *fs,	 const char *path,
+		    struct tmfs_file_info *fi);
+int tmfs_fs_open(struct tmfs_fs *fs, const char *path,
+		 struct tmfs_file_info *fi);
+int tmfs_fs_read(struct tmfs_fs *fs, const char *path, char *buf, size_t size,
+		 off_t off, struct tmfs_file_info *fi);
+int tmfs_fs_read_buf(struct tmfs_fs *fs, const char *path,
+		     struct tmfs_bufvec **bufp, size_t size, off_t off,
+		     struct tmfs_file_info *fi);
+int tmfs_fs_write(struct tmfs_fs *fs, const char *path, const char *buf,
+		  size_t size, off_t off, struct tmfs_file_info *fi);
+int tmfs_fs_write_buf(struct tmfs_fs *fs, const char *path,
+		      struct tmfs_bufvec *buf, off_t off,
+		      struct tmfs_file_info *fi);
+int tmfs_fs_fsync(struct tmfs_fs *fs, const char *path, int datasync,
+		  struct tmfs_file_info *fi);
+int tmfs_fs_flush(struct tmfs_fs *fs, const char *path,
+		  struct tmfs_file_info *fi);
+int tmfs_fs_statfs(struct tmfs_fs *fs, const char *path, struct statvfs *buf);
+int tmfs_fs_opendir(struct tmfs_fs *fs, const char *path,
+		    struct tmfs_file_info *fi);
+int tmfs_fs_readdir(struct tmfs_fs *fs, const char *path, void *buf,
+		    tmfs_fill_dir_t filler, off_t off,
+		    struct tmfs_file_info *fi);
+int tmfs_fs_fsyncdir(struct tmfs_fs *fs, const char *path, int datasync,
+		     struct tmfs_file_info *fi);
+int tmfs_fs_releasedir(struct tmfs_fs *fs, const char *path,
+		       struct tmfs_file_info *fi);
+int tmfs_fs_create(struct tmfs_fs *fs, const char *path, mode_t mode,
+		   struct tmfs_file_info *fi);
+int tmfs_fs_lock(struct tmfs_fs *fs, const char *path,
+		 struct tmfs_file_info *fi, int cmd, struct flock *lock);
+int tmfs_fs_flock(struct tmfs_fs *fs, const char *path,
+		  struct tmfs_file_info *fi, int op);
+int tmfs_fs_chmod(struct tmfs_fs *fs, const char *path, mode_t mode);
+int tmfs_fs_chown(struct tmfs_fs *fs, const char *path, uid_t uid, gid_t gid);
+int tmfs_fs_truncate(struct tmfs_fs *fs, const char *path, off_t size);
+int tmfs_fs_ftruncate(struct tmfs_fs *fs, const char *path, off_t size,
+		      struct tmfs_file_info *fi);
+int tmfs_fs_utimens(struct tmfs_fs *fs, const char *path,
 		    const struct timespec tv[2]);
-int fuse_fs_access(struct fuse_fs *fs, const char *path, int mask);
-int fuse_fs_readlink(struct fuse_fs *fs, const char *path, char *buf,
+int tmfs_fs_access(struct tmfs_fs *fs, const char *path, int mask);
+int tmfs_fs_readlink(struct tmfs_fs *fs, const char *path, char *buf,
 		     size_t len);
-int fuse_fs_mknod(struct fuse_fs *fs, const char *path, mode_t mode,
+int tmfs_fs_mknod(struct tmfs_fs *fs, const char *path, mode_t mode,
 		  dev_t rdev);
-int fuse_fs_mkdir(struct fuse_fs *fs, const char *path, mode_t mode);
-int fuse_fs_setxattr(struct fuse_fs *fs, const char *path, const char *name,
+int tmfs_fs_mkdir(struct tmfs_fs *fs, const char *path, mode_t mode);
+int tmfs_fs_setxattr(struct tmfs_fs *fs, const char *path, const char *name,
 		     const char *value, size_t size, int flags);
-int fuse_fs_getxattr(struct fuse_fs *fs, const char *path, const char *name,
+int tmfs_fs_getxattr(struct tmfs_fs *fs, const char *path, const char *name,
 		     char *value, size_t size);
-int fuse_fs_listxattr(struct fuse_fs *fs, const char *path, char *list,
+int tmfs_fs_listxattr(struct tmfs_fs *fs, const char *path, char *list,
 		      size_t size);
-int fuse_fs_removexattr(struct fuse_fs *fs, const char *path,
+int tmfs_fs_removexattr(struct tmfs_fs *fs, const char *path,
 			const char *name);
-int fuse_fs_bmap(struct fuse_fs *fs, const char *path, size_t blocksize,
+int tmfs_fs_bmap(struct tmfs_fs *fs, const char *path, size_t blocksize,
 		 uint64_t *idx);
-int fuse_fs_ioctl(struct fuse_fs *fs, const char *path, int cmd, void *arg,
-		  struct fuse_file_info *fi, unsigned int flags, void *data);
-int fuse_fs_poll(struct fuse_fs *fs, const char *path,
-		 struct fuse_file_info *fi, struct fuse_pollhandle *ph,
+int tmfs_fs_ioctl(struct tmfs_fs *fs, const char *path, int cmd, void *arg,
+		  struct tmfs_file_info *fi, unsigned int flags, void *data);
+int tmfs_fs_poll(struct tmfs_fs *fs, const char *path,
+		 struct tmfs_file_info *fi, struct tmfs_pollhandle *ph,
 		 unsigned *reventsp);
-int fuse_fs_fallocate(struct fuse_fs *fs, const char *path, int mode,
-		 off_t offset, off_t length, struct fuse_file_info *fi);
-void fuse_fs_init(struct fuse_fs *fs, struct fuse_conn_info *conn);
-void fuse_fs_destroy(struct fuse_fs *fs);
+int tmfs_fs_fallocate(struct tmfs_fs *fs, const char *path, int mode,
+		 off_t offset, off_t length, struct tmfs_file_info *fi);
+void tmfs_fs_init(struct tmfs_fs *fs, struct tmfs_conn_info *conn);
+void tmfs_fs_destroy(struct tmfs_fs *fs);
 
-int fuse_notify_poll(struct fuse_pollhandle *ph);
+int tmfs_notify_poll(struct tmfs_pollhandle *ph);
 
 /**
- * Create a new fuse filesystem object
+ * Create a new tmfs filesystem object
  *
- * This is usually called from the factory of a fuse module to create
+ * This is usually called from the factory of a tmfs module to create
  * a new instance of a filesystem.
  *
  * @param op the filesystem operations
- * @param op_size the size of the fuse_operations structure
+ * @param op_size the size of the tmfs_operations structure
  * @param user_data user data supplied in the context during the init() method
  * @return a new filesystem object
  */
-struct fuse_fs *fuse_fs_new(const struct fuse_operations *op, size_t op_size,
+struct tmfs_fs *tmfs_fs_new(const struct tmfs_operations *op, size_t op_size,
 			    void *user_data);
 
 /**
  * Filesystem module
  *
- * Filesystem modules are registered with the FUSE_REGISTER_MODULE()
+ * Filesystem modules are registered with the TMFS_REGISTER_MODULE()
  * macro.
  *
  * If the "-omodules=modname:..." option is present, filesystem
  * objects are created and pushed onto the stack with the 'factory'
  * function.
  */
-struct fuse_module {
+struct tmfs_module {
 	/**
 	 * Name of filesystem
 	 */
@@ -937,34 +937,34 @@ struct fuse_module {
 	 * @param fs NULL terminated filesystem object vector
 	 * @return the new filesystem object
 	 */
-	struct fuse_fs *(*factory)(struct fuse_args *args,
-				   struct fuse_fs *fs[]);
+	struct tmfs_fs *(*factory)(struct tmfs_args *args,
+				   struct tmfs_fs *fs[]);
 
-	struct fuse_module *next;
-	struct fusemod_so *so;
+	struct tmfs_module *next;
+	struct tmfsmod_so *so;
 	int ctr;
 };
 
 /**
  * Register a filesystem module
  *
- * This function is used by FUSE_REGISTER_MODULE and there's usually
+ * This function is used by TMFS_REGISTER_MODULE and there's usually
  * no need to call it directly
  */
-void fuse_register_module(struct fuse_module *mod);
+void tmfs_register_module(struct tmfs_module *mod);
 
 /**
  * Register filesystem module
  *
  * For the parameters, see description of the fields in 'struct
- * fuse_module'
+ * tmfs_module'
  */
-#define FUSE_REGISTER_MODULE(name_, factory_)				  \
+#define TMFS_REGISTER_MODULE(name_, factory_)				  \
 	static __attribute__((constructor)) void name_ ## _register(void) \
 	{								  \
-		static struct fuse_module mod =				  \
+		static struct tmfs_module mod =				  \
 			{ #name_, factory_, NULL, NULL, 0 };		  \
-		fuse_register_module(&mod);				  \
+		tmfs_register_module(&mod);				  \
 	}
 
 
@@ -976,80 +976,80 @@ void fuse_register_module(struct fuse_module *mod);
    from the 3.0 API.  Use the lowlevel session functions instead */
 
 /** Function type used to process commands */
-typedef void (*fuse_processor_t)(struct fuse *, struct fuse_cmd *, void *);
+typedef void (*tmfs_processor_t)(struct tmfs *, struct tmfs_cmd *, void *);
 
-/** This is the part of fuse_main() before the event loop */
-struct fuse *fuse_setup(int argc, char *argv[],
-			const struct fuse_operations *op, size_t op_size,
+/** This is the part of tmfs_main() before the event loop */
+struct tmfs *tmfs_setup(int argc, char *argv[],
+			const struct tmfs_operations *op, size_t op_size,
 			char **mountpoint, int *multithreaded,
 			void *user_data);
 
-/** This is the part of fuse_main() after the event loop */
-void fuse_teardown(struct fuse *fuse, char *mountpoint);
+/** This is the part of tmfs_main() after the event loop */
+void tmfs_teardown(struct tmfs *tmfs, char *mountpoint);
 
 /** Read a single command.  If none are read, return NULL */
-struct fuse_cmd *fuse_read_cmd(struct fuse *f);
+struct tmfs_cmd *tmfs_read_cmd(struct tmfs *f);
 
 /** Process a single command */
-void fuse_process_cmd(struct fuse *f, struct fuse_cmd *cmd);
+void tmfs_process_cmd(struct tmfs *f, struct tmfs_cmd *cmd);
 
 /** Multi threaded event loop, which calls the custom command
     processor function */
-int fuse_loop_mt_proc(struct fuse *f, fuse_processor_t proc, void *data);
+int tmfs_loop_mt_proc(struct tmfs *f, tmfs_processor_t proc, void *data);
 
-/** Return the exited flag, which indicates if fuse_exit() has been
+/** Return the exited flag, which indicates if tmfs_exit() has been
     called */
-int fuse_exited(struct fuse *f);
+int tmfs_exited(struct tmfs *f);
 
 /** This function is obsolete and implemented as a no-op */
-void fuse_set_getcontext_func(struct fuse_context *(*func)(void));
+void tmfs_set_getcontext_func(struct tmfs_context *(*func)(void));
 
-/** Get session from fuse object */
-struct fuse_session *fuse_get_session(struct fuse *f);
+/** Get session from tmfs object */
+struct tmfs_session *tmfs_get_session(struct tmfs *f);
 
 /* ----------------------------------------------------------- *
  * Compatibility stuff					       *
  * ----------------------------------------------------------- */
 
-#if FUSE_USE_VERSION < 26
-#  include "fuse_compat.h"
-#  undef fuse_main
-#  if FUSE_USE_VERSION == 25
-#    define fuse_main(argc, argv, op)				\
-	fuse_main_real_compat25(argc, argv, op, sizeof(*(op)))
-#    define fuse_new fuse_new_compat25
-#    define fuse_setup fuse_setup_compat25
-#    define fuse_teardown fuse_teardown_compat22
-#    define fuse_operations fuse_operations_compat25
-#  elif FUSE_USE_VERSION == 22
-#    define fuse_main(argc, argv, op)				\
-	fuse_main_real_compat22(argc, argv, op, sizeof(*(op)))
-#    define fuse_new fuse_new_compat22
-#    define fuse_setup fuse_setup_compat22
-#    define fuse_teardown fuse_teardown_compat22
-#    define fuse_operations fuse_operations_compat22
-#    define fuse_file_info fuse_file_info_compat
-#  elif FUSE_USE_VERSION == 24
+#if TMFS_USE_VERSION < 26
+#  include "tmfs_compat.h"
+#  undef tmfs_main
+#  if TMFS_USE_VERSION == 25
+#    define tmfs_main(argc, argv, op)				\
+	tmfs_main_real_compat25(argc, argv, op, sizeof(*(op)))
+#    define tmfs_new tmfs_new_compat25
+#    define tmfs_setup tmfs_setup_compat25
+#    define tmfs_teardown tmfs_teardown_compat22
+#    define tmfs_operations tmfs_operations_compat25
+#  elif TMFS_USE_VERSION == 22
+#    define tmfs_main(argc, argv, op)				\
+	tmfs_main_real_compat22(argc, argv, op, sizeof(*(op)))
+#    define tmfs_new tmfs_new_compat22
+#    define tmfs_setup tmfs_setup_compat22
+#    define tmfs_teardown tmfs_teardown_compat22
+#    define tmfs_operations tmfs_operations_compat22
+#    define tmfs_file_info tmfs_file_info_compat
+#  elif TMFS_USE_VERSION == 24
 #    error Compatibility with high-level API version 24 not supported
 #  else
-#    define fuse_dirfil_t fuse_dirfil_t_compat
-#    define __fuse_read_cmd fuse_read_cmd
-#    define __fuse_process_cmd fuse_process_cmd
-#    define __fuse_loop_mt fuse_loop_mt_proc
-#    if FUSE_USE_VERSION == 21
-#      define fuse_operations fuse_operations_compat2
-#      define fuse_main fuse_main_compat2
-#      define fuse_new fuse_new_compat2
-#      define __fuse_setup fuse_setup_compat2
-#      define __fuse_teardown fuse_teardown_compat22
-#      define __fuse_exited fuse_exited
-#      define __fuse_set_getcontext_func fuse_set_getcontext_func
+#    define tmfs_dirfil_t tmfs_dirfil_t_compat
+#    define __tmfs_read_cmd tmfs_read_cmd
+#    define __tmfs_process_cmd tmfs_process_cmd
+#    define __tmfs_loop_mt tmfs_loop_mt_proc
+#    if TMFS_USE_VERSION == 21
+#      define tmfs_operations tmfs_operations_compat2
+#      define tmfs_main tmfs_main_compat2
+#      define tmfs_new tmfs_new_compat2
+#      define __tmfs_setup tmfs_setup_compat2
+#      define __tmfs_teardown tmfs_teardown_compat22
+#      define __tmfs_exited tmfs_exited
+#      define __tmfs_set_getcontext_func tmfs_set_getcontext_func
 #    else
-#      define fuse_statfs fuse_statfs_compat1
-#      define fuse_operations fuse_operations_compat1
-#      define fuse_main fuse_main_compat1
-#      define fuse_new fuse_new_compat1
-#      define FUSE_DEBUG FUSE_DEBUG_COMPAT1
+#      define tmfs_statfs tmfs_statfs_compat1
+#      define tmfs_operations tmfs_operations_compat1
+#      define tmfs_main tmfs_main_compat1
+#      define tmfs_new tmfs_new_compat1
+#      define TMFS_DEBUG TMFS_DEBUG_COMPAT1
 #    endif
 #  endif
 #endif
@@ -1058,4 +1058,4 @@ struct fuse_session *fuse_get_session(struct fuse *f);
 }
 #endif
 
-#endif /* _FUSE_H_ */
+#endif /* _TMFS_H_ */

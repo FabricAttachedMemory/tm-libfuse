@@ -1,15 +1,15 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
   Copyright (C) 2011       Sebastian Pipping <sebastian@pipping.org>
 
   This program can be distributed under the terms of the GNU GPL.
   See the file COPYING.
 
-  gcc -Wall fusexmp.c `pkg-config fuse --cflags --libs` -o fusexmp
+  gcc -Wall tmfsxmp.c `pkg-config tmfs --cflags --libs` -o tmfsxmp
 */
 
-#define FUSE_USE_VERSION 26
+#define TMFS_USE_VERSION 26
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -20,7 +20,7 @@
 #define _XOPEN_SOURCE 700
 #endif
 
-#include <fuse.h>
+#include <tmfs.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -68,8 +68,8 @@ static int xmp_readlink(const char *path, char *buf, size_t size)
 }
 
 
-static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-		       off_t offset, struct fuse_file_info *fi)
+static int xmp_readdir(const char *path, void *buf, tmfs_fill_dir_t filler,
+		       off_t offset, struct tmfs_file_info *fi)
 {
 	DIR *dp;
 	struct dirent *de;
@@ -227,7 +227,7 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 }
 #endif
 
-static int xmp_open(const char *path, struct fuse_file_info *fi)
+static int xmp_open(const char *path, struct tmfs_file_info *fi)
 {
 	int res;
 
@@ -240,7 +240,7 @@ static int xmp_open(const char *path, struct fuse_file_info *fi)
 }
 
 static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
-		    struct fuse_file_info *fi)
+		    struct tmfs_file_info *fi)
 {
 	int fd;
 	int res;
@@ -259,7 +259,7 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 }
 
 static int xmp_write(const char *path, const char *buf, size_t size,
-		     off_t offset, struct fuse_file_info *fi)
+		     off_t offset, struct tmfs_file_info *fi)
 {
 	int fd;
 	int res;
@@ -288,7 +288,7 @@ static int xmp_statfs(const char *path, struct statvfs *stbuf)
 	return 0;
 }
 
-static int xmp_release(const char *path, struct fuse_file_info *fi)
+static int xmp_release(const char *path, struct tmfs_file_info *fi)
 {
 	/* Just a stub.	 This method is optional and can safely be left
 	   unimplemented */
@@ -299,7 +299,7 @@ static int xmp_release(const char *path, struct fuse_file_info *fi)
 }
 
 static int xmp_fsync(const char *path, int isdatasync,
-		     struct fuse_file_info *fi)
+		     struct tmfs_file_info *fi)
 {
 	/* Just a stub.	 This method is optional and can safely be left
 	   unimplemented */
@@ -312,7 +312,7 @@ static int xmp_fsync(const char *path, int isdatasync,
 
 #ifdef HAVE_POSIX_FALLOCATE
 static int xmp_fallocate(const char *path, int mode,
-			off_t offset, off_t length, struct fuse_file_info *fi)
+			off_t offset, off_t length, struct tmfs_file_info *fi)
 {
 	int fd;
 	int res;
@@ -370,7 +370,7 @@ static int xmp_removexattr(const char *path, const char *name)
 }
 #endif /* HAVE_SETXATTR */
 
-static struct fuse_operations xmp_oper = {
+static struct tmfs_operations xmp_oper = {
 	.getattr	= xmp_getattr,
 	.access		= xmp_access,
 	.readlink	= xmp_readlink,
@@ -408,5 +408,5 @@ static struct fuse_operations xmp_oper = {
 int main(int argc, char *argv[])
 {
 	umask(0);
-	return fuse_main(argc, argv, &xmp_oper, NULL);
+	return tmfs_main(argc, argv, &xmp_oper, NULL);
 }

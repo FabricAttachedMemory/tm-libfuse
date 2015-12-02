@@ -1,15 +1,15 @@
 /*
-  FUSE: Filesystem in Userspace
+  TMFS: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
   Copyright (C) 2011       Sebastian Pipping <sebastian@pipping.org>
 
   This program can be distributed under the terms of the GNU GPL.
   See the file COPYING.
 
-  gcc -Wall fusexmp_fh.c `pkg-config fuse --cflags --libs` -lulockmgr -o fusexmp_fh
+  gcc -Wall tmfsxmp_fh.c `pkg-config tmfs --cflags --libs` -lulockmgr -o tmfsxmp_fh
 */
 
-#define FUSE_USE_VERSION 26
+#define TMFS_USE_VERSION 26
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -17,7 +17,7 @@
 
 #define _GNU_SOURCE
 
-#include <fuse.h>
+#include <tmfs.h>
 #include <ulockmgr.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,7 +45,7 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 }
 
 static int xmp_fgetattr(const char *path, struct stat *stbuf,
-			struct fuse_file_info *fi)
+			struct tmfs_file_info *fi)
 {
 	int res;
 
@@ -87,7 +87,7 @@ struct xmp_dirp {
 	off_t offset;
 };
 
-static int xmp_opendir(const char *path, struct fuse_file_info *fi)
+static int xmp_opendir(const char *path, struct tmfs_file_info *fi)
 {
 	int res;
 	struct xmp_dirp *d = malloc(sizeof(struct xmp_dirp));
@@ -107,13 +107,13 @@ static int xmp_opendir(const char *path, struct fuse_file_info *fi)
 	return 0;
 }
 
-static inline struct xmp_dirp *get_dirp(struct fuse_file_info *fi)
+static inline struct xmp_dirp *get_dirp(struct tmfs_file_info *fi)
 {
 	return (struct xmp_dirp *) (uintptr_t) fi->fh;
 }
 
-static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-		       off_t offset, struct fuse_file_info *fi)
+static int xmp_readdir(const char *path, void *buf, tmfs_fill_dir_t filler,
+		       off_t offset, struct tmfs_file_info *fi)
 {
 	struct xmp_dirp *d = get_dirp(fi);
 
@@ -147,7 +147,7 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return 0;
 }
 
-static int xmp_releasedir(const char *path, struct fuse_file_info *fi)
+static int xmp_releasedir(const char *path, struct tmfs_file_info *fi)
 {
 	struct xmp_dirp *d = get_dirp(fi);
 	(void) path;
@@ -270,7 +270,7 @@ static int xmp_truncate(const char *path, off_t size)
 }
 
 static int xmp_ftruncate(const char *path, off_t size,
-			 struct fuse_file_info *fi)
+			 struct tmfs_file_info *fi)
 {
 	int res;
 
@@ -297,7 +297,7 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 }
 #endif
 
-static int xmp_create(const char *path, mode_t mode, struct fuse_file_info *fi)
+static int xmp_create(const char *path, mode_t mode, struct tmfs_file_info *fi)
 {
 	int fd;
 
@@ -309,7 +309,7 @@ static int xmp_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 	return 0;
 }
 
-static int xmp_open(const char *path, struct fuse_file_info *fi)
+static int xmp_open(const char *path, struct tmfs_file_info *fi)
 {
 	int fd;
 
@@ -322,7 +322,7 @@ static int xmp_open(const char *path, struct fuse_file_info *fi)
 }
 
 static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
-		    struct fuse_file_info *fi)
+		    struct tmfs_file_info *fi)
 {
 	int res;
 
@@ -334,20 +334,20 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 	return res;
 }
 
-static int xmp_read_buf(const char *path, struct fuse_bufvec **bufp,
-			size_t size, off_t offset, struct fuse_file_info *fi)
+static int xmp_read_buf(const char *path, struct tmfs_bufvec **bufp,
+			size_t size, off_t offset, struct tmfs_file_info *fi)
 {
-	struct fuse_bufvec *src;
+	struct tmfs_bufvec *src;
 
 	(void) path;
 
-	src = malloc(sizeof(struct fuse_bufvec));
+	src = malloc(sizeof(struct tmfs_bufvec));
 	if (src == NULL)
 		return -ENOMEM;
 
-	*src = FUSE_BUFVEC_INIT(size);
+	*src = TMFS_BUFVEC_INIT(size);
 
-	src->buf[0].flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
+	src->buf[0].flags = TMFS_BUF_IS_FD | TMFS_BUF_FD_SEEK;
 	src->buf[0].fd = fi->fh;
 	src->buf[0].pos = offset;
 
@@ -357,7 +357,7 @@ static int xmp_read_buf(const char *path, struct fuse_bufvec **bufp,
 }
 
 static int xmp_write(const char *path, const char *buf, size_t size,
-		     off_t offset, struct fuse_file_info *fi)
+		     off_t offset, struct tmfs_file_info *fi)
 {
 	int res;
 
@@ -369,18 +369,18 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 	return res;
 }
 
-static int xmp_write_buf(const char *path, struct fuse_bufvec *buf,
-		     off_t offset, struct fuse_file_info *fi)
+static int xmp_write_buf(const char *path, struct tmfs_bufvec *buf,
+		     off_t offset, struct tmfs_file_info *fi)
 {
-	struct fuse_bufvec dst = FUSE_BUFVEC_INIT(fuse_buf_size(buf));
+	struct tmfs_bufvec dst = TMFS_BUFVEC_INIT(tmfs_buf_size(buf));
 
 	(void) path;
 
-	dst.buf[0].flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
+	dst.buf[0].flags = TMFS_BUF_IS_FD | TMFS_BUF_FD_SEEK;
 	dst.buf[0].fd = fi->fh;
 	dst.buf[0].pos = offset;
 
-	return fuse_buf_copy(&dst, buf, FUSE_BUF_SPLICE_NONBLOCK);
+	return tmfs_buf_copy(&dst, buf, TMFS_BUF_SPLICE_NONBLOCK);
 }
 
 static int xmp_statfs(const char *path, struct statvfs *stbuf)
@@ -394,7 +394,7 @@ static int xmp_statfs(const char *path, struct statvfs *stbuf)
 	return 0;
 }
 
-static int xmp_flush(const char *path, struct fuse_file_info *fi)
+static int xmp_flush(const char *path, struct tmfs_file_info *fi)
 {
 	int res;
 
@@ -411,7 +411,7 @@ static int xmp_flush(const char *path, struct fuse_file_info *fi)
 	return 0;
 }
 
-static int xmp_release(const char *path, struct fuse_file_info *fi)
+static int xmp_release(const char *path, struct tmfs_file_info *fi)
 {
 	(void) path;
 	close(fi->fh);
@@ -420,7 +420,7 @@ static int xmp_release(const char *path, struct fuse_file_info *fi)
 }
 
 static int xmp_fsync(const char *path, int isdatasync,
-		     struct fuse_file_info *fi)
+		     struct tmfs_file_info *fi)
 {
 	int res;
 	(void) path;
@@ -441,7 +441,7 @@ static int xmp_fsync(const char *path, int isdatasync,
 
 #ifdef HAVE_POSIX_FALLOCATE
 static int xmp_fallocate(const char *path, int mode,
-			off_t offset, off_t length, struct fuse_file_info *fi)
+			off_t offset, off_t length, struct tmfs_file_info *fi)
 {
 	(void) path;
 
@@ -489,7 +489,7 @@ static int xmp_removexattr(const char *path, const char *name)
 }
 #endif /* HAVE_SETXATTR */
 
-static int xmp_lock(const char *path, struct fuse_file_info *fi, int cmd,
+static int xmp_lock(const char *path, struct tmfs_file_info *fi, int cmd,
 		    struct flock *lock)
 {
 	(void) path;
@@ -498,7 +498,7 @@ static int xmp_lock(const char *path, struct fuse_file_info *fi, int cmd,
 			   sizeof(fi->lock_owner));
 }
 
-static int xmp_flock(const char *path, struct fuse_file_info *fi, int op)
+static int xmp_flock(const char *path, struct tmfs_file_info *fi, int op)
 {
 	int res;
 	(void) path;
@@ -510,7 +510,7 @@ static int xmp_flock(const char *path, struct fuse_file_info *fi, int op)
 	return 0;
 }
 
-static struct fuse_operations xmp_oper = {
+static struct tmfs_operations xmp_oper = {
 	.getattr	= xmp_getattr,
 	.fgetattr	= xmp_fgetattr,
 	.access		= xmp_access,
@@ -563,5 +563,5 @@ static struct fuse_operations xmp_oper = {
 int main(int argc, char *argv[])
 {
 	umask(0);
-	return fuse_main(argc, argv, &xmp_oper, NULL);
+	return tmfs_main(argc, argv, &xmp_oper, NULL);
 }
