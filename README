@@ -27,10 +27,14 @@ this release, which supports kernels >= 2.4.21.
 Installation
 ============
 
-./configure
+sudo apt-get install automake libtool
+./makeconf.sh
+./configure --libdir="/lib/x86_64-linux-gnu"
 make
-make install
-modprobe fuse
+sudo make install
+
+Assuming you have cloned and installed tm-fuse-4.x.x,
+modprobe tm-fuse
 
 You may also need to add '/usr/local/lib' to '/etc/ld.so.conf' and/or
 run ldconfig.
