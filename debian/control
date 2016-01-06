@@ -1,0 +1,13 @@
+Source: tm-libfuse
+Section: unknown
+Priority: optional
+Maintainer: Greg Pearson <greg.pearson@hpe.com>
+Build-Depends: debhelper (>= 9)
+Standards-Version: 3.9.6
+
+Package: tm-libfuse
+Architecture: all
+Depends: libtool, gettext, automake
+Recommends:
+Description: LFS libfuse
+ Librarian Filesystem libfuse
