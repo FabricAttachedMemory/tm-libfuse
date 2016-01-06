@@ -6,7 +6,7 @@ cd /usr/src/tm-libfuse
 
 ./configure --libdir="/lib/x86_64-linux-gnu"
 
-make
+make all
 
 make install
 
