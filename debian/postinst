@@ -4,7 +4,7 @@ cd /usr/src/tm-libfuse
 
 ./makeconf.sh
 
-./configure --libdir="/lib/x86_64-linux-gnu"
+./configure --libdir="/lib/$(uname -m)-linux-gnu"
 
 make all
 

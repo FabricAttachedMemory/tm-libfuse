@@ -1,6 +1,5 @@
 AUTHORS		usr/src/tm-libfuse
 ChangeLog	usr/src/tm-libfuse
-config.rpath	usr/src/tm-libfuse
 configure.ac	usr/src/tm-libfuse
 COPYING		usr/src/tm-libfuse
 COPYING.LIB	usr/src/tm-libfuse
