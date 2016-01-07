@@ -28,5 +28,6 @@ rm -f /usr/src/tm-libfuse/configure
 rm -f /usr/src/tm-libfuse/INSTALL
 rm -f /usr/src/tm-libfuse/ltmain.sh
 rm -f /usr/src/tm-libfuse/Makefile.in
+rm -f /usr/src/tm-libfuse/config.rpath
 
 exit 0
