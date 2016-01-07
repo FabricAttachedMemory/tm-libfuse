@@ -1,0 +1,15 @@
+#!/bin/bash
+
+cd /usr/src/tm-libfuse
+
+./makeconf.sh
+
+./configure --libdir="/lib/$(uname -m)-linux-gnu"
+
+make all
+
+make install
+
+make clean
+
+exit 0
