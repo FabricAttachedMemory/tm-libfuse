@@ -1,3 +1,9 @@
+tm-libfuse (0.2-1+l4tm1) catapult; urgency=low
+
+  * Conform to new packaging policies.
+
+ -- Greg Pearson <greg.pearson@hpe.com>  Tue, 29 Mar 2016 12:23:50 -0600
+
 tm-libfuse (0.0.1) UNRELEASED; urgency=medium
 
   * Initial packaging

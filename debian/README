@@ -6,7 +6,7 @@ Packaging tm-libfuse for L4TM
 - cd tm-libfuse
 - ensure you are on the master branch "git checkout master"
 - edit debian/changelog file and create new entry and increment version
-- create a git tag for the commit you want to package (ex: git tag -a v0.0.1 <commit>)
+- create a git tag for the commit you want to package (ex: git tag -a v0.3-1+l4tm1)
 - push the changelog and tag to gitlab master branch "git push origin master"
 - create the debian package "dpkg-buildpackage -tc"
 - packaged files will be located in the parent directory
