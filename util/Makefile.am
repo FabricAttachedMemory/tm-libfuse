@@ -24,8 +24,8 @@ install-exec-hook:
 	-chmod u+s $(DESTDIR)$(bindir)/tmfsrmount
 	@if test ! -e $(DESTDIR)/dev/tmfs; then \
 		$(MKDIR_P) $(DESTDIR)/dev; \
-		echo "mknod $(DESTDIR)/dev/tmfs -m 0666 c 10 229 || true"; \
-		mknod $(DESTDIR)/dev/tmfs -m 0666 c 10 229 || true; \
+		echo "mknod $(DESTDIR)/dev/tmfs -m 0666 c 10 240 || true"; \
+		mknod $(DESTDIR)/dev/tmfs -m 0666 c 10 240 || true; \
 	fi
 
 EXTRA_DIST = udev.rules init_script
