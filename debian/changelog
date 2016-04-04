@@ -1,3 +1,9 @@
+tm-libfuse (0.3-1+l4tm1) catapult; urgency=low
+
+  * Fix tmfs device file creation with incorrect minor number, which causes LFS mount failure.
+
+ -- Greg Pearson <greg.pearson@hpe.com>  Mon, 04 Apr 2016 15:38:04 -0600
+
 tm-libfuse (0.2-1+l4tm1) catapult; urgency=low
 
   * Conform to new packaging policies.
