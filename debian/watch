@@ -1,2 +1,2 @@
 version=3
-https://hlinux-gitlab.us.rdlabs.hpecorp.net/l4tm/tm-libfuse/tags .*/v(\d.+)
+https://github.hpe.com/hpelinux/tm-libfuse/tags .*/v(\d.+)

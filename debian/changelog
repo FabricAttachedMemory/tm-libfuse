@@ -1,3 +1,9 @@
+tm-libfuse (0.4-1+l4tm1) catapult; urgency=low
+
+  * Move git repositories to github.
+
+ -- Greg Pearson <greg.pearson@hpe.com>  Tue, 05 Apr 2016 17:22:30 -0600
+
 tm-libfuse (0.3-1+l4tm1) catapult; urgency=low
 
   * Fix tmfs device file creation with incorrect minor number, which causes LFS mount failure.

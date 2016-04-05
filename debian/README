@@ -2,13 +2,14 @@
 Packaging tm-libfuse for L4TM
 ---------------------------------------------------------------------------
 - login to "hlinux-build.us.rdlabs.hpecorp.net"
-- git clone https://hlinux-gitlab.us.rdlabs.hpecorp.net/l4tm/tm-libfuse.git
+- git clone git@github.hpe.com:hpelinux/tm-libfuse.git
 - cd tm-libfuse
+- ensure you are on a development branch
+- edit debian/changelog file, create new entry and increment version
+- commit change, push to remote and merge into master branch
 - ensure you are on the "hp_l4tm" branch "git checkout hp_l4tm"
-- edit debian/changelog file and create new entry and increment version
-- submit the changes to debian/changelog and merge into hp_l4tm branch
 - create a git tag for the commit you want to package (ex: git tag -a v0.3-1+l4tm1)
-- push the tag to gitlab hp_l4tm branch "git push origin hp_l4tm"
+- push the tag to github hp_l4tm branch "git push origin hp_l4tm --follow-tags"
 - create the debian package "dpkg-buildpackage -tc"
 - packaged files will be located in the parent directory
 - check that the package passes all tests "dput -o l4tm *.changes" 
