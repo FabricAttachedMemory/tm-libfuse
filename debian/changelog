@@ -1,3 +1,9 @@
+tm-libfuse (0.5-1+l4tm1) catapult; urgency=low
+
+  * Add Vcs-Browser and Vcs-Git debian packaging fields to control file
+
+ -- Greg Pearson <greg.pearson@hpe.com>  Mon, 23 May 2016 10:18:03 -0600
+
 tm-libfuse (0.4-1+l4tm1) catapult; urgency=low
 
   * Move git repositories to github.
