@@ -1,0 +1,5 @@
+tm-libfuse (1.0+l4tm1) catapult; urgency=low
+
+  * Initial packaging using automated build system
+
+ -- Greg Pearson <greg.pearson@hpe.com>  Tue, 09 Aug 2016 15:24:34 -0600
