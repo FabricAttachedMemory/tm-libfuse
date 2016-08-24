@@ -1,3 +1,9 @@
+tm-libfuse (1.0+l4tm1) catapult; urgency=low
+
+  * Initial packaging using automated build system
+
+ -- Greg Pearson <greg.pearson@hpe.com>  Fri, 05 Aug 2016 15:47:15 -0600
+
 tm-libfuse (0.5-1+l4tm1) catapult; urgency=low
 
   * Add Vcs-Browser and Vcs-Git debian packaging fields to control file
