@@ -14,10 +14,8 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 %:
 	dh ${@} --parallel --buildsystem=autoconf
 
-override_dh_auto_reconf:
-	./makeconf.sh
-
 override_dh_auto_configure:
+	./makeconf.sh
 	dh_auto_configure -- --bindir=/bin --libdir=/usr/lib/$(DEB_HOST_MULTIARCH)
 
 override_dh_fixperms:

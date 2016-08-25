@@ -21,5 +21,5 @@ Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${misc:Depends},
  ${shlibs:Depends},
-Description: TM LFS  (library)
+Description: TM LFS (library)
  The Machine File System (LFS) shared library.
