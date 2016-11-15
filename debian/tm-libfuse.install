@@ -1,0 +1,4 @@
+bin/tmfsrmount
+sbin/mount.tmfs
+debian/local/tmfs.conf	/etc
+usr/lib/*/*.so.*	lib

@@ -1,0 +1,20 @@
+Source: tm-libfuse
+Section: utils
+Priority: optional
+Maintainer: Keith Packard <packard@hpe.com>
+Uploaders: Keith Packard <keithp@keithp.com>
+Build-Depends: debhelper (>= 9),
+	dh-autoreconf,
+	libselinux-dev [linux-any]
+Standards-Version: 3.9.5
+Origin: HPE
+
+Package: tm-libfuse
+Section: libs
+Architecture: linux-any
+Multi-Arch: same
+Pre-Depends: ${misc:Pre-Depends}
+Depends: ${misc:Depends},
+	${shlibs:Depends},
+Description: TM LFS (library)
+ The Machine File System (LFS) shared library.

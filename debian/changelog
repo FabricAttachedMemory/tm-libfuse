@@ -1,0 +1,5 @@
+tm-libfuse (1.1-1) stable; urgency=low
+
+  * Repackage for Jessie
+
+ -- Keith Packard <packard@hpe.com>  Tue, 15 Nov 2016 14:57:10 -0800
