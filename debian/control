@@ -6,7 +6,7 @@ Uploaders: Keith Packard <keithp@keithp.com>
 Build-Depends: debhelper (>= 9),
 	dh-autoreconf,
 	libselinux-dev [linux-any]
-Standards-Version: 3.9.5
+Standards-Version: 3.9.6
 Origin: HPE
 
 Package: tm-libfuse
